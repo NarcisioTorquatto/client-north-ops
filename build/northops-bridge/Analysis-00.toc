@@ -13,7 +13,14 @@
  False,
  {},
  0,
+<<<<<<< HEAD
  [],
+=======
+ [('SimConnect\\SimConnect.dll',
+   'D:\\PYTHON '
+   'PROGRAMS\\north-ops-client\\venv\\Lib\\site-packages\\SimConnect\\SimConnect.dll',
+   'BINARY')],
+>>>>>>> ec27544 (updaten and corrections)
  [],
  '3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit '
  '(AMD64)]',
@@ -200,12 +207,21 @@
   ('dis', 'C:\\Python314\\Lib\\dis.py', 'PYMODULE'),
   ('opcode', 'C:\\Python314\\Lib\\opcode.py', 'PYMODULE'),
   ('_opcode_metadata', 'C:\\Python314\\Lib\\_opcode_metadata.py', 'PYMODULE'),
+<<<<<<< HEAD
   ('stringprep', 'C:\\Python314\\Lib\\stringprep.py', 'PYMODULE'),
   ('_py_warnings', 'C:\\Python314\\Lib\\_py_warnings.py', 'PYMODULE'),
   ('tracemalloc', 'C:\\Python314\\Lib\\tracemalloc.py', 'PYMODULE'),
   ('subprocess', 'C:\\Python314\\Lib\\subprocess.py', 'PYMODULE'),
   ('signal', 'C:\\Python314\\Lib\\signal.py', 'PYMODULE'),
   ('_py_abc', 'C:\\Python314\\Lib\\_py_abc.py', 'PYMODULE'),
+=======
+  ('_py_warnings', 'C:\\Python314\\Lib\\_py_warnings.py', 'PYMODULE'),
+  ('tracemalloc', 'C:\\Python314\\Lib\\tracemalloc.py', 'PYMODULE'),
+  ('stringprep', 'C:\\Python314\\Lib\\stringprep.py', 'PYMODULE'),
+  ('_py_abc', 'C:\\Python314\\Lib\\_py_abc.py', 'PYMODULE'),
+  ('subprocess', 'C:\\Python314\\Lib\\subprocess.py', 'PYMODULE'),
+  ('signal', 'C:\\Python314\\Lib\\signal.py', 'PYMODULE'),
+>>>>>>> ec27544 (updaten and corrections)
   ('codeop', 'C:\\Python314\\Lib\\codeop.py', 'PYMODULE'),
   ('SimConnect.SimConnect',
    'D:\\PYTHON '
@@ -251,7 +267,15 @@
   ('json.encoder', 'C:\\Python314\\Lib\\json\\encoder.py', 'PYMODULE'),
   ('json.decoder', 'C:\\Python314\\Lib\\json\\decoder.py', 'PYMODULE'),
   ('json.scanner', 'C:\\Python314\\Lib\\json\\scanner.py', 'PYMODULE')],
+<<<<<<< HEAD
  [('python314.dll', 'C:\\Python314\\python314.dll', 'BINARY'),
+=======
+ [('SimConnect\\SimConnect.dll',
+   'D:\\PYTHON '
+   'PROGRAMS\\north-ops-client\\venv\\Lib\\site-packages\\SimConnect\\SimConnect.dll',
+   'BINARY'),
+  ('python314.dll', 'C:\\Python314\\python314.dll', 'BINARY'),
+>>>>>>> ec27544 (updaten and corrections)
   ('_decimal.pyd', 'C:\\Python314\\DLLs\\_decimal.pyd', 'EXTENSION'),
   ('_hashlib.pyd', 'C:\\Python314\\DLLs\\_hashlib.pyd', 'EXTENSION'),
   ('_ssl.pyd', 'C:\\Python314\\DLLs\\_ssl.pyd', 'EXTENSION'),
@@ -263,16 +287,43 @@
   ('_bz2.pyd', 'C:\\Python314\\DLLs\\_bz2.pyd', 'EXTENSION'),
   ('_ctypes.pyd', 'C:\\Python314\\DLLs\\_ctypes.pyd', 'EXTENSION'),
   ('VCRUNTIME140.dll', 'C:\\Python314\\VCRUNTIME140.dll', 'BINARY'),
+<<<<<<< HEAD
   ('libcrypto-3.dll', 'C:\\Python314\\DLLs\\libcrypto-3.dll', 'BINARY'),
   ('libssl-3.dll', 'C:\\Python314\\DLLs\\libssl-3.dll', 'BINARY'),
   ('libffi-8.dll', 'C:\\Python314\\DLLs\\libffi-8.dll', 'BINARY')],
+=======
+  ('MSVCP140.dll', 'C:\\WINDOWS\\system32\\MSVCP140.dll', 'BINARY'),
+  ('libcrypto-3.dll', 'C:\\Python314\\DLLs\\libcrypto-3.dll', 'BINARY'),
+  ('libssl-3.dll', 'C:\\Python314\\DLLs\\libssl-3.dll', 'BINARY'),
+  ('libffi-8.dll', 'C:\\Python314\\DLLs\\libffi-8.dll', 'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\WINDOWS\\system32\\VCRUNTIME140_1.dll',
+   'BINARY')],
+>>>>>>> ec27544 (updaten and corrections)
  [],
  [],
  [('base_library.zip',
    'D:\\PYTHON '
    'PROGRAMS\\north-ops-client\\build\\northops-bridge\\base_library.zip',
    'DATA')],
+<<<<<<< HEAD
  [('encodings.zlib_codec',
+=======
+ [('posixpath', 'C:\\Python314\\Lib\\posixpath.py', 'PYMODULE'),
+  ('operator', 'C:\\Python314\\Lib\\operator.py', 'PYMODULE'),
+  ('stat', 'C:\\Python314\\Lib\\stat.py', 'PYMODULE'),
+  ('types', 'C:\\Python314\\Lib\\types.py', 'PYMODULE'),
+  ('warnings', 'C:\\Python314\\Lib\\warnings.py', 'PYMODULE'),
+  ('ntpath', 'C:\\Python314\\Lib\\ntpath.py', 'PYMODULE'),
+  ('_weakrefset', 'C:\\Python314\\Lib\\_weakrefset.py', 'PYMODULE'),
+  ('copyreg', 'C:\\Python314\\Lib\\copyreg.py', 'PYMODULE'),
+  ('linecache', 'C:\\Python314\\Lib\\linecache.py', 'PYMODULE'),
+  ('io', 'C:\\Python314\\Lib\\io.py', 'PYMODULE'),
+  ('collections', 'C:\\Python314\\Lib\\collections\\__init__.py', 'PYMODULE'),
+  ('sre_compile', 'C:\\Python314\\Lib\\sre_compile.py', 'PYMODULE'),
+  ('locale', 'C:\\Python314\\Lib\\locale.py', 'PYMODULE'),
+  ('encodings.zlib_codec',
+>>>>>>> ec27544 (updaten and corrections)
    'C:\\Python314\\Lib\\encodings\\zlib_codec.py',
    'PYMODULE'),
   ('encodings.uu_codec',
@@ -518,6 +569,7 @@
    'PYMODULE'),
   ('encodings', 'C:\\Python314\\Lib\\encodings\\__init__.py', 'PYMODULE'),
   ('heapq', 'C:\\Python314\\Lib\\heapq.py', 'PYMODULE'),
+<<<<<<< HEAD
   ('types', 'C:\\Python314\\Lib\\types.py', 'PYMODULE'),
   ('codecs', 'C:\\Python314\\Lib\\codecs.py', 'PYMODULE'),
   ('reprlib', 'C:\\Python314\\Lib\\reprlib.py', 'PYMODULE'),
@@ -525,11 +577,25 @@
   ('warnings', 'C:\\Python314\\Lib\\warnings.py', 'PYMODULE'),
   ('linecache', 'C:\\Python314\\Lib\\linecache.py', 'PYMODULE'),
   ('operator', 'C:\\Python314\\Lib\\operator.py', 'PYMODULE'),
+=======
+  ('weakref', 'C:\\Python314\\Lib\\weakref.py', 'PYMODULE'),
+  ('enum', 'C:\\Python314\\Lib\\enum.py', 'PYMODULE'),
+  ('_collections_abc', 'C:\\Python314\\Lib\\_collections_abc.py', 'PYMODULE'),
+  ('abc', 'C:\\Python314\\Lib\\abc.py', 'PYMODULE'),
+  ('sre_parse', 'C:\\Python314\\Lib\\sre_parse.py', 'PYMODULE'),
+  ('sre_constants', 'C:\\Python314\\Lib\\sre_constants.py', 'PYMODULE'),
+  ('os', 'C:\\Python314\\Lib\\os.py', 'PYMODULE'),
+  ('functools', 'C:\\Python314\\Lib\\functools.py', 'PYMODULE'),
+  ('traceback', 'C:\\Python314\\Lib\\traceback.py', 'PYMODULE'),
+  ('genericpath', 'C:\\Python314\\Lib\\genericpath.py', 'PYMODULE'),
+  ('keyword', 'C:\\Python314\\Lib\\keyword.py', 'PYMODULE'),
+>>>>>>> ec27544 (updaten and corrections)
   ('re._parser', 'C:\\Python314\\Lib\\re\\_parser.py', 'PYMODULE'),
   ('re._constants', 'C:\\Python314\\Lib\\re\\_constants.py', 'PYMODULE'),
   ('re._compiler', 'C:\\Python314\\Lib\\re\\_compiler.py', 'PYMODULE'),
   ('re._casefix', 'C:\\Python314\\Lib\\re\\_casefix.py', 'PYMODULE'),
   ('re', 'C:\\Python314\\Lib\\re\\__init__.py', 'PYMODULE'),
+<<<<<<< HEAD
   ('os', 'C:\\Python314\\Lib\\os.py', 'PYMODULE'),
   ('genericpath', 'C:\\Python314\\Lib\\genericpath.py', 'PYMODULE'),
   ('collections', 'C:\\Python314\\Lib\\collections\\__init__.py', 'PYMODULE'),
@@ -549,3 +615,7 @@
   ('stat', 'C:\\Python314\\Lib\\stat.py', 'PYMODULE'),
   ('sre_parse', 'C:\\Python314\\Lib\\sre_parse.py', 'PYMODULE'),
   ('io', 'C:\\Python314\\Lib\\io.py', 'PYMODULE')])
+=======
+  ('codecs', 'C:\\Python314\\Lib\\codecs.py', 'PYMODULE'),
+  ('reprlib', 'C:\\Python314\\Lib\\reprlib.py', 'PYMODULE')])
+>>>>>>> ec27544 (updaten and corrections)

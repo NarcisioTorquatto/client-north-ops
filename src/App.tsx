@@ -6,6 +6,15 @@ const FUEL_CHEAT_FINE = 15000;
 const SIM_RATE_CHEAT_FINE = 25000;
 const FUEL_TOLERANCE_GAL = 3;
 
+type UpdateState =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "none"
+  | "error";
+
 function calculateDistanceNM(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 3440.065;
   const toRad = (value: number) => (value * Math.PI) / 180;
@@ -103,7 +112,9 @@ function getPaymentBonus(level: number, isPremium: boolean) {
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
   const [password, setPassword] = useState(() => localStorage.getItem("northops_password") || "");
-  const [rememberLogin, setRememberLogin] = useState(() => localStorage.getItem("northops_remember_login") === "true");
+  const [rememberLogin, setRememberLogin] = useState(
+    () => localStorage.getItem("northops_remember_login") === "true"
+  );
 
   const [user, setUser] = useState<any>(null);
   const [activeMission, setActiveMission] = useState<any>(null);
@@ -114,11 +125,13 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Cliente iniciado.");
-  const [appVersion, setAppVersion] = useState("...");
-  const [updateStatus, setUpdateStatus] = useState("Verificando...");
-  const [updateDownloaded, setUpdateDownloaded] = useState(false);  
   const [canFinishFlight, setCanFinishFlight] = useState(false);
   const [cheatMessage, setCheatMessage] = useState("");
+
+  const [appVersion, setAppVersion] = useState("...");
+  const [updateStatus, setUpdateStatus] = useState("Pronto");
+  const [updateState, setUpdateState] = useState<UpdateState>("idle");
+  const [updatePercent, setUpdatePercent] = useState(0);
 
   const simDataRef = useRef<any>(null);
   const landingStartedAtRef = useRef<number | null>(null);
@@ -153,11 +166,11 @@ function App() {
       setSimData(data);
     });
   }, []);
+
   useEffect(() => {
     async function loadVersion() {
       try {
         const version = await window.northOps.getAppVersion();
-
         setAppVersion(version);
       } catch {
         setAppVersion("?");
@@ -167,14 +180,20 @@ function App() {
     loadVersion();
 
     window.northOps.onUpdateStatus((data: any) => {
-      setUpdateStatus(data.message || "");
+      const status = data.status || "idle";
 
-      if (data.status === "downloaded") {
-        setUpdateDownloaded(true);
+      setUpdateState(status);
+      setUpdateStatus(data.message || "Pronto");
+
+      if (status === "downloading") {
+        setUpdatePercent(Number(data.percent || 0));
+      }
+
+      if (status === "downloaded") {
+        setUpdatePercent(100);
       }
     });
   }, []);
-
 
   useEffect(() => {
     if (!activeMission || !simData) {
@@ -241,6 +260,29 @@ function App() {
 
     setValidationStatus({ ok: true, message: "Tudo OK. Pronto para iniciar." });
   }, [activeMission, simData, originAirport]);
+
+  async function handleUpdateButton() {
+    try {
+      if (updateState === "available") {
+        setUpdateState("downloading");
+        setUpdateStatus("Baixando atualização...");
+        await window.northOps.downloadUpdate();
+        return;
+      }
+
+      if (updateState === "downloaded") {
+        await window.northOps.installUpdate();
+        return;
+      }
+
+      setUpdateState("checking");
+      setUpdateStatus("Verificando atualizações...");
+      await window.northOps.checkForUpdates();
+    } catch {
+      setUpdateState("error");
+      setUpdateStatus("Não foi possível verificar atualizações.");
+    }
+  }
 
   async function applyFineAndCancelFlight(reason: string, fine: number, clientStatus: string) {
     if (!activeMission || !user || cheatDetectedRef.current) return;
@@ -693,29 +735,24 @@ function App() {
           <StatusDot online={!!simData?.connected} label={simData?.connected ? "MSFS online" : "MSFS offline"} />
           <StatusDot online={!!simData?.on_ground} label={simData?.on_ground ? "Em solo" : "Em voo"} />
         </div>
+
         <div className="update-box">
           <span>Versão v{appVersion}</span>
 
           <button
-            onClick={() => window.northOps.checkForUpdates()}
+            onClick={handleUpdateButton}
+            disabled={updateState === "checking" || updateState === "downloading"}
           >
-            Verificar atualização
+            {updateState === "checking" && "Verificando..."}
+            {updateState === "available" && "Atualizar agora"}
+            {updateState === "downloading" && `Baixando ${updatePercent}%`}
+            {updateState === "downloaded" && "Reiniciar e instalar"}
+            {(updateState === "idle" || updateState === "none" || updateState === "error") &&
+              "Verificar atualização"}
           </button>
-
-          {updateDownloaded && (
-            <button
-              onClick={() => window.northOps.installUpdate()}
-            >
-              Reiniciar e atualizar
-            </button>
-          )}
 
           <small>{updateStatus}</small>
         </div>
-
-
-
-
       </header>
 
       {!user && (
@@ -794,33 +831,13 @@ function App() {
 
           <div className="telemetry-strip">
             <Metric label="Aeronave" value={simData?.aircraft || activeMission.aircraft || "-"} />
-
             <FuelMetric fuel={fuelPercent} />
-
             <Metric label="Velocidade" value={`${Math.round(simData?.ground_speed || 0)} kt`} />
-
             <Metric label="Motor" value={simData?.engine_running ? "Ligado" : "Desligado"} />
-
-            <Metric
-              label="Peso Pax"
-              value={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`}
-            />
-
-            <Metric
-              label="Peso Carga"
-              value={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`}
-            />
-
-            <Metric
-              label="Fuel Planejado"
-              value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
-            />
-
-            <Metric
-              label="Peso Decolagem"
-              value={`${Math.round(activeMission.takeoff_weight_kg || 0)} kg`}
-            />
-
+            <Metric label="Peso Pax" value={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`} />
+            <Metric label="Peso Carga" value={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`} />
+            <Metric label="Fuel Planejado" value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`} />
+            <Metric label="Peso Decolagem" value={`${Math.round(activeMission.takeoff_weight_kg || 0)} kg`} />
             <Metric
               label="Pagamento"
               value={`$${activeMission.payment?.toLocaleString("pt-BR")}`}

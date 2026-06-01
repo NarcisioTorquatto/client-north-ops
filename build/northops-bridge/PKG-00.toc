@@ -44,6 +44,13 @@
   ('bridge',
    'D:\\PYTHON PROGRAMS\\north-ops-client\\simconnect\\bridge.py',
    'PYSOURCE'),
+<<<<<<< HEAD
+=======
+  ('SimConnect\\SimConnect.dll',
+   'D:\\PYTHON '
+   'PROGRAMS\\north-ops-client\\venv\\Lib\\site-packages\\SimConnect\\SimConnect.dll',
+   'BINARY'),
+>>>>>>> ec27544 (updaten and corrections)
   ('python314.dll', 'C:\\Python314\\python314.dll', 'BINARY'),
   ('_decimal.pyd', 'C:\\Python314\\DLLs\\_decimal.pyd', 'EXTENSION'),
   ('_hashlib.pyd', 'C:\\Python314\\DLLs\\_hashlib.pyd', 'EXTENSION'),
@@ -56,9 +63,17 @@
   ('_bz2.pyd', 'C:\\Python314\\DLLs\\_bz2.pyd', 'EXTENSION'),
   ('_ctypes.pyd', 'C:\\Python314\\DLLs\\_ctypes.pyd', 'EXTENSION'),
   ('VCRUNTIME140.dll', 'C:\\Python314\\VCRUNTIME140.dll', 'BINARY'),
+<<<<<<< HEAD
   ('libcrypto-3.dll', 'C:\\Python314\\DLLs\\libcrypto-3.dll', 'BINARY'),
   ('libssl-3.dll', 'C:\\Python314\\DLLs\\libssl-3.dll', 'BINARY'),
   ('libffi-8.dll', 'C:\\Python314\\DLLs\\libffi-8.dll', 'BINARY'),
+=======
+  ('MSVCP140.dll', 'C:\\WINDOWS\\system32\\MSVCP140.dll', 'BINARY'),
+  ('libcrypto-3.dll', 'C:\\Python314\\DLLs\\libcrypto-3.dll', 'BINARY'),
+  ('libssl-3.dll', 'C:\\Python314\\DLLs\\libssl-3.dll', 'BINARY'),
+  ('libffi-8.dll', 'C:\\Python314\\DLLs\\libffi-8.dll', 'BINARY'),
+  ('VCRUNTIME140_1.dll', 'C:\\WINDOWS\\system32\\VCRUNTIME140_1.dll', 'BINARY'),
+>>>>>>> ec27544 (updaten and corrections)
   ('base_library.zip',
    'D:\\PYTHON '
    'PROGRAMS\\north-ops-client\\build\\northops-bridge\\base_library.zip',

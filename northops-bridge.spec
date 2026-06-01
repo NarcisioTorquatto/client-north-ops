@@ -4,7 +4,7 @@
 a = Analysis(
     ['simconnect\\bridge.py'],
     pathex=[],
-    binaries=[],
+    binaries=[('D:\\PYTHON PROGRAMS\\north-ops-client\\venv\\Lib\\site-packages\\SimConnect\\SimConnect.dll', 'SimConnect')],
     datas=[],
     hiddenimports=[],
     hookspath=[],

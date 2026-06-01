@@ -115,8 +115,13 @@ pythonProcess = spawn(bridgePath, [], {
   });
 
   pythonProcess.on("error", (error) => {
+<<<<<<< HEAD
     sendBridgeStatus(`Erro ao iniciar Python: ${error.message}`);
+=======
+    sendBridgeStatus(`Erro ao iniciar bridge: ${error.message}`);
+>>>>>>> ec27544 (updaten and corrections)
   });
+
 
   pythonProcess.on("close", (code) => {
     sendBridgeStatus(`Bridge encerrada: ${code}`);
