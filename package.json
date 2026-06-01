@@ -39,32 +39,38 @@
     "vite": "^8.0.12",
     "wait-on": "^9.0.10"
   },
-  "build": {
-    "appId": "com.northops.client",
-    "productName": "NORTH OPS Client",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "simconnect/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "NORTH OPS Client"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "NarcisioTorquatto",
-      "repo": "client-north-ops"
-    }
+"build": {
+  "appId": "com.northops.client",
+  "productName": "NORTH OPS Client",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+"extraResources": [
+  {
+    "from": "resources/bridge",
+    "to": "bridge"
   }
+    
+  ],
+  "win": {
+    "target": "nsis"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "NORTH OPS Client"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "NarcisioTorquatto",
+    "repo": "client-north-ops"
+  }
+}
 }

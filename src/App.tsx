@@ -114,6 +114,9 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Cliente iniciado.");
+  const [appVersion, setAppVersion] = useState("...");
+  const [updateStatus, setUpdateStatus] = useState("Verificando...");
+  const [updateDownloaded, setUpdateDownloaded] = useState(false);  
   const [canFinishFlight, setCanFinishFlight] = useState(false);
   const [cheatMessage, setCheatMessage] = useState("");
 
@@ -150,6 +153,28 @@ function App() {
       setSimData(data);
     });
   }, []);
+  useEffect(() => {
+    async function loadVersion() {
+      try {
+        const version = await window.northOps.getAppVersion();
+
+        setAppVersion(version);
+      } catch {
+        setAppVersion("?");
+      }
+    }
+
+    loadVersion();
+
+    window.northOps.onUpdateStatus((data: any) => {
+      setUpdateStatus(data.message || "");
+
+      if (data.status === "downloaded") {
+        setUpdateDownloaded(true);
+      }
+    });
+  }, []);
+
 
   useEffect(() => {
     if (!activeMission || !simData) {
@@ -668,6 +693,29 @@ function App() {
           <StatusDot online={!!simData?.connected} label={simData?.connected ? "MSFS online" : "MSFS offline"} />
           <StatusDot online={!!simData?.on_ground} label={simData?.on_ground ? "Em solo" : "Em voo"} />
         </div>
+        <div className="update-box">
+          <span>Versão v{appVersion}</span>
+
+          <button
+            onClick={() => window.northOps.checkForUpdates()}
+          >
+            Verificar atualização
+          </button>
+
+          {updateDownloaded && (
+            <button
+              onClick={() => window.northOps.installUpdate()}
+            >
+              Reiniciar e atualizar
+            </button>
+          )}
+
+          <small>{updateStatus}</small>
+        </div>
+
+
+
+
       </header>
 
       {!user && (

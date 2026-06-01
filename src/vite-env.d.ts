@@ -12,5 +12,15 @@ interface Window {
       cargo_weight_kg: number;
       takeoff_weight_kg: number;
     }) => Promise<any>;
+
+    getAppVersion: () => Promise<string>;
+
+    checkForUpdates: () => Promise<any>;
+
+    downloadUpdate: () => Promise<any>;
+
+    installUpdate: () => Promise<any>;
+
+    onUpdateStatus: (callback: (data: any) => void) => void;
   };
 }

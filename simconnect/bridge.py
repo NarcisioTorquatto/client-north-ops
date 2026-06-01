@@ -22,6 +22,7 @@ def send(data):
 
 def read_var(name):
     global aq
+
     try:
         request = aq.find(name)
         return normalize(request.value)
@@ -32,14 +33,27 @@ def read_var(name):
 def write_var(name, value):
     global aq
 
+    # IMPORTANTE:
+    # aq.set precisa vir primeiro.
+    # request.value pode alterar só o cache local e não aplicar no MSFS.
     try:
-        request = aq.find(name)
-        request.value = value
-        return {"ok": True, "method": "request.value", "name": name, "value": value}
+        aq.set(name, value)
+        return {
+            "ok": True,
+            "method": "aq.set",
+            "name": name,
+            "value": value,
+        }
     except Exception as e1:
         try:
-            aq.set(name, value)
-            return {"ok": True, "method": "aq.set", "name": name, "value": value}
+            request = aq.find(name)
+            request.value = value
+            return {
+                "ok": True,
+                "method": "request.value",
+                "name": name,
+                "value": value,
+            }
         except Exception as e2:
             return {
                 "ok": False,
@@ -69,22 +83,20 @@ def apply_fuel(total_fuel_lbs):
 
     results = []
 
-    fuel_vars = [
-        ("FUEL_TANK_LEFT_MAIN_QUANTITY", left_gal),
-        ("FUEL_TANK_RIGHT_MAIN_QUANTITY", right_gal),
-        ("FUEL_TANK_CENTER_QUANTITY", 0),
-        ("FUEL_TANK_LEFT_AUX_QUANTITY", 0),
-        ("FUEL_TANK_RIGHT_AUX_QUANTITY", 0),
-    ]
-
-    for name, value in fuel_vars:
-        results.append(write_var(name, value))
-
+    # 1) Aplica percentual total primeiro
+    results.append(write_var("FUEL_TOTAL_QUANTITY_PERCENT", fuel_percent))
     time.sleep(0.5)
 
-    percent_result = write_var("FUEL_TOTAL_QUANTITY_PERCENT", fuel_percent)
+    # 2) Aplica galões diretamente nos tanques principais
+    results.append(write_var("FUEL_TANK_LEFT_MAIN_QUANTITY", left_gal))
+    results.append(write_var("FUEL_TANK_RIGHT_MAIN_QUANTITY", right_gal))
 
-    time.sleep(0.5)
+    # 3) Zera tanques auxiliares para evitar conflito
+    results.append(write_var("FUEL_TANK_CENTER_QUANTITY", 0))
+    results.append(write_var("FUEL_TANK_LEFT_AUX_QUANTITY", 0))
+    results.append(write_var("FUEL_TANK_RIGHT_AUX_QUANTITY", 0))
+
+    time.sleep(1)
 
     readback = {
         "fuel_total_capacity": read_var("FUEL_TOTAL_CAPACITY"),
@@ -97,14 +109,13 @@ def apply_fuel(total_fuel_lbs):
         "right_aux": read_var("FUEL_TANK_RIGHT_AUX_QUANTITY"),
     }
 
-    success = any(item["ok"] for item in results) or percent_result.get("ok")
+    success = any(item["ok"] for item in results)
 
     return {
         "ok": success,
         "total_fuel_lbs": total_fuel_lbs,
         "total_fuel_gal": total_gal,
         "fuel_percent_target": fuel_percent,
-        "percent_result": percent_result,
         "results": results,
         "readback": readback,
     }
@@ -140,7 +151,7 @@ def apply_briefing(payload):
         "payload": {
             "ok": True,
             "applied_to_sim": False,
-            "message": "Peso de passageiros e carga registrado apenas no NORTH OPS. O MSFS não aplica payload via SimConnect padrão.",
+            "message": "Peso de passageiros e carga registrado apenas no NORTH OPS.",
             "passenger_weight_kg": passenger_weight_kg,
             "cargo_weight_kg": cargo_weight_kg,
             "takeoff_weight_kg": takeoff_weight_kg,
@@ -196,7 +207,9 @@ def main():
     while True:
         try:
             sm = SimConnect()
-            aq = AircraftRequests(sm, _time=2000)
+
+            # _time=0 força leitura mais atual possível
+            aq = AircraftRequests(sm, _time=0)
 
             time.sleep(3)
 

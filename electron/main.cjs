@@ -1,12 +1,23 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
+const fs = require("fs");
 const { spawn } = require("child_process");
 
 const isDev = !app.isPackaged;
+
 let mainWindow;
 let pythonProcess;
-
 const pendingCommands = new Map();
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function sendToRenderer(channel, data) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, data);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -30,13 +41,44 @@ function createWindow() {
   }
 }
 
+function getBridgePath() {
+  if (isDev) {
+    return path.join(__dirname, "../resources/bridge/northops-bridge.exe");
+  }
+
+  return path.join(process.resourcesPath, "bridge", "northops-bridge.exe");
+}
+
+function sendBridgeStatus(status) {
+  sendToRenderer("sim-data", {
+    connected: false,
+    aircraft: null,
+    latitude: null,
+    longitude: null,
+    altitude_ft: null,
+    ground_speed: null,
+    heading: null,
+    fuel_percent: null,
+    fuel_total_quantity: null,
+    fuel_total_capacity: null,
+    sim_rate: 1,
+    on_ground: false,
+    engine_running: false,
+    bridge_status: status,
+  });
+}
+
 function startSimBridge() {
-  const bridgePath = path.join(__dirname, "../simconnect/bridge.py");
+  const bridgePath = getBridgePath();
 
-  console.log("Iniciando bridge:", bridgePath);
+  if (!fs.existsSync(bridgePath)) {
+    sendBridgeStatus(`Bridge não encontrado em: ${bridgePath}`);
+    return;
+  }
 
-  pythonProcess = spawn("python", [bridgePath], {
+pythonProcess = spawn(bridgePath, [], {
     stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
   });
 
   pythonProcess.stdout.on("data", (data) => {
@@ -49,44 +91,106 @@ function startSimBridge() {
         const message = JSON.parse(line);
 
         if (message.type === "command_result") {
-          console.log("RESULTADO COMANDO PYTHON:", JSON.stringify(message, null, 2));
           const pending = pendingCommands.get(message.requestId);
 
           if (pending) {
             pendingCommands.delete(message.requestId);
 
-            if (message.ok) {
-              pending.resolve(message);
-            } else {
-              pending.reject(new Error(message.error || "Erro ao executar comando."));
-            }
+            if (message.ok) pending.resolve(message);
+            else pending.reject(new Error(message.error || "Erro ao executar comando."));
           }
 
           return;
         }
 
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("sim-data", message);
-        }
+        sendToRenderer("sim-data", message);
       } catch (error) {
-        console.error("Erro ao ler dados do simulador:", line);
-        console.error(error);
+        console.error("Erro ao ler bridge:", error);
       }
     });
   });
 
   pythonProcess.stderr.on("data", (data) => {
-    console.error("Python error:", data.toString());
+    sendBridgeStatus(data.toString());
   });
 
   pythonProcess.on("error", (error) => {
-    console.error("Erro ao iniciar Python:", error);
+    sendBridgeStatus(`Erro ao iniciar Python: ${error.message}`);
   });
 
   pythonProcess.on("close", (code) => {
-    console.log("Bridge Python encerrada com código:", code);
+    sendBridgeStatus(`Bridge encerrada: ${code}`);
   });
 }
+
+function setupUpdater() {
+  autoUpdater.on("checking-for-update", () => {
+    sendToRenderer("update-status", {
+      status: "checking",
+      message: "Verificando atualizações...",
+    });
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    sendToRenderer("update-status", {
+      status: "available",
+      version: info.version,
+      message: `Nova versão disponível: v${info.version}`,
+    });
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    sendToRenderer("update-status", {
+      status: "none",
+      message: "Você já está na versão mais recente.",
+    });
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    sendToRenderer("update-status", {
+      status: "downloading",
+      percent: Math.round(progress.percent),
+      message: `Baixando atualização: ${Math.round(progress.percent)}%`,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    sendToRenderer("update-status", {
+      status: "downloaded",
+      message: "Atualização pronta para instalar.",
+    });
+  });
+
+  autoUpdater.on("error", (error) => {
+    sendToRenderer("update-status", {
+      status: "error",
+      message: `Erro na atualização: ${error.message}`,
+    });
+  });
+}
+
+ipcMain.handle("get-app-version", () => {
+  return app.getVersion();
+});
+
+ipcMain.handle("check-for-updates", async () => {
+  if (isDev) {
+    return {
+      status: "dev",
+      message: "Atualizações só funcionam no app instalado.",
+    };
+  }
+
+  return await autoUpdater.checkForUpdates();
+});
+
+ipcMain.handle("download-update", async () => {
+  return await autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle("install-update", () => {
+  autoUpdater.quitAndInstall();
+});
 
 ipcMain.handle("apply-briefing-to-aircraft", async (_event, briefing) => {
   if (!pythonProcess || pythonProcess.killed) {
@@ -125,12 +229,17 @@ ipcMain.handle("apply-briefing-to-aircraft", async (_event, briefing) => {
 app.whenReady().then(() => {
   createWindow();
   startSimBridge();
+  setupUpdater();
+
+  if (!isDev) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 5000);
+  }
 });
 
 app.on("window-all-closed", () => {
-  if (pythonProcess) {
-    pythonProcess.kill();
-  }
+  if (pythonProcess) pythonProcess.kill();
 
   if (process.platform !== "darwin") {
     app.quit();
