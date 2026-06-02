@@ -58,6 +58,13 @@ function sendBridgeStatus(status) {
     altitude_ft: null,
     ground_speed: null,
     heading: null,
+
+    g_force: null,
+    bank_degrees: null,
+    pitch_degrees: null,
+    vertical_speed: null,
+    airspeed_indicated: null,
+
     fuel_percent: null,
     fuel_total_quantity: null,
     fuel_total_capacity: null,
@@ -76,7 +83,7 @@ function startSimBridge() {
     return;
   }
 
-pythonProcess = spawn(bridgePath, [], {
+  pythonProcess = spawn(bridgePath, [], {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -115,13 +122,8 @@ pythonProcess = spawn(bridgePath, [], {
   });
 
   pythonProcess.on("error", (error) => {
-<<<<<<< HEAD
-    sendBridgeStatus(`Erro ao iniciar Python: ${error.message}`);
-=======
     sendBridgeStatus(`Erro ao iniciar bridge: ${error.message}`);
->>>>>>> ec27544 (updaten and corrections)
   });
-
 
   pythonProcess.on("close", (code) => {
     sendBridgeStatus(`Bridge encerrada: ${code}`);

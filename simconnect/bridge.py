@@ -33,9 +33,6 @@ def read_var(name):
 def write_var(name, value):
     global aq
 
-    # IMPORTANTE:
-    # aq.set precisa vir primeiro.
-    # request.value pode alterar só o cache local e não aplicar no MSFS.
     try:
         aq.set(name, value)
         return {
@@ -83,15 +80,12 @@ def apply_fuel(total_fuel_lbs):
 
     results = []
 
-    # 1) Aplica percentual total primeiro
     results.append(write_var("FUEL_TOTAL_QUANTITY_PERCENT", fuel_percent))
     time.sleep(0.5)
 
-    # 2) Aplica galões diretamente nos tanques principais
     results.append(write_var("FUEL_TANK_LEFT_MAIN_QUANTITY", left_gal))
     results.append(write_var("FUEL_TANK_RIGHT_MAIN_QUANTITY", right_gal))
 
-    # 3) Zera tanques auxiliares para evitar conflito
     results.append(write_var("FUEL_TANK_CENTER_QUANTITY", 0))
     results.append(write_var("FUEL_TANK_LEFT_AUX_QUANTITY", 0))
     results.append(write_var("FUEL_TANK_RIGHT_AUX_QUANTITY", 0))
@@ -169,6 +163,8 @@ def apply_briefing(payload):
 
 def command_listener():
     while True:
+        request_id = None
+
         try:
             line = sys.stdin.readline()
 
@@ -193,7 +189,7 @@ def command_listener():
         except Exception as e:
             send({
                 "type": "command_result",
-                "requestId": request_id if "request_id" in locals() else None,
+                "requestId": request_id,
                 "ok": False,
                 "error": str(e),
             })
@@ -207,8 +203,6 @@ def main():
     while True:
         try:
             sm = SimConnect()
-
-            # _time=0 força leitura mais atual possível
             aq = AircraftRequests(sm, _time=0)
 
             time.sleep(3)
@@ -235,8 +229,6 @@ def main():
                 airspeed_indicated = read_var("AIRSPEED_INDICATED")
 
                 fuel_percent = read_var("FUEL_TOTAL_QUANTITY_PERCENT")
-
-
                 fuel_total_quantity = read_var("FUEL_TOTAL_QUANTITY")
                 fuel_total_capacity = read_var("FUEL_TOTAL_CAPACITY")
                 sim_rate = read_var("SIMULATION_RATE")
@@ -252,7 +244,6 @@ def main():
                     "ground_speed": ground_speed,
                     "heading": heading,
 
-                    # Avaliação de pilotagem
                     "g_force": g_force,
                     "bank_degrees": bank_degrees,
                     "pitch_degrees": pitch_degrees,
