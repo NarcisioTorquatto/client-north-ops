@@ -226,7 +226,17 @@ def main():
                 altitude_ft = read_var("PLANE_ALTITUDE")
                 ground_speed = read_var("GROUND_VELOCITY")
                 heading = read_var("PLANE_HEADING_DEGREES_TRUE")
+
+                # Dados para avaliação de pilotagem
+                g_force = read_var("G_FORCE")
+                bank_degrees = read_var("PLANE_BANK_DEGREES")
+                pitch_degrees = read_var("PLANE_PITCH_DEGREES")
+                vertical_speed = read_var("VERTICAL_SPEED")
+                airspeed_indicated = read_var("AIRSPEED_INDICATED")
+
                 fuel_percent = read_var("FUEL_TOTAL_QUANTITY_PERCENT")
+
+
                 fuel_total_quantity = read_var("FUEL_TOTAL_QUANTITY")
                 fuel_total_capacity = read_var("FUEL_TOTAL_CAPACITY")
                 sim_rate = read_var("SIMULATION_RATE")
@@ -241,6 +251,14 @@ def main():
                     "altitude_ft": altitude_ft,
                     "ground_speed": ground_speed,
                     "heading": heading,
+
+                    # Avaliação de pilotagem
+                    "g_force": g_force,
+                    "bank_degrees": bank_degrees,
+                    "pitch_degrees": pitch_degrees,
+                    "vertical_speed": vertical_speed,
+                    "airspeed_indicated": airspeed_indicated,
+
                     "fuel_percent": fuel_percent,
                     "fuel_total_quantity": fuel_total_quantity,
                     "fuel_total_capacity": fuel_total_capacity,
@@ -261,6 +279,13 @@ def main():
                 "altitude_ft": None,
                 "ground_speed": None,
                 "heading": None,
+
+                "g_force": None,
+                "bank_degrees": None,
+                "pitch_degrees": None,
+                "vertical_speed": None,
+                "airspeed_indicated": None,
+
                 "fuel_percent": None,
                 "fuel_total_quantity": None,
                 "fuel_total_capacity": None,

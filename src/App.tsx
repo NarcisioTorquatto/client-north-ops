@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { supabaseClient } from "./services/supabaseClient";
 import "./App.css";
 
 const FUEL_CHEAT_FINE = 15000;
 const SIM_RATE_CHEAT_FINE = 25000;
 const FUEL_TOLERANCE_GAL = 3;
+
+const MAX_SAFE_G_FORCE = 2.2;
+const MAX_SAFE_BANK_ANGLE = 45;
+const MAX_SAFE_PITCH_ANGLE = 20;
+const MAX_SAFE_DESCENT_RATE = -1200;
+const HARD_LANDING_DESCENT_RATE = -700;
+const HIGH_LANDING_SPEED = 95;
 
 type UpdateState =
   | "idle"
@@ -48,7 +55,11 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
   };
 
   const aliases = aircraftAliases[mission];
-  if (!aliases) return sim.includes(mission) || mission.includes(sim);
+
+  if (!aliases) {
+    return sim.includes(mission) || mission.includes(sim);
+  }
+
   return aliases.some((alias) => sim.includes(alias));
 }
 
@@ -109,6 +120,130 @@ function getPaymentBonus(level: number, isPremium: boolean) {
   return bonus;
 }
 
+function addFlightEvent(eventsRef: MutableRefObject<any[]>, event: any) {
+  const alreadyExists = eventsRef.current.some((item) => item.code === event.code);
+
+  if (alreadyExists) return;
+
+  eventsRef.current.push({
+    ...event,
+    created_at: new Date().toISOString(),
+  });
+}
+
+function calculatePilotEvaluation({
+  mission,
+  events,
+  baseXp,
+  remainingFuelPercent,
+  maxGForce,
+  maxBankAngle,
+  maxPitchAngle,
+  maxDescentRate,
+  landingSpeed,
+}: {
+  mission: any;
+  events: any[];
+  baseXp: number;
+  remainingFuelPercent: number;
+  maxGForce: number;
+  maxBankAngle: number;
+  maxPitchAngle: number;
+  maxDescentRate: number;
+  landingSpeed: number;
+}) {
+  const finalEvents = [...events];
+
+  if (remainingFuelPercent < 10) {
+    finalEvents.push({
+      code: "low_arrival_fuel",
+      type: "warning",
+      title: "Combustível baixo na chegada",
+      message: `A aeronave chegou com apenas ${remainingFuelPercent}% de combustível.`,
+      penalty: 0.5,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  if (finalEvents.length === 0 && remainingFuelPercent >= 10) {
+    finalEvents.push({
+      code: "stable_flight",
+      type: "positive",
+      title: "Voo estável",
+      message: "Nenhum evento severo de pilotagem foi detectado durante o voo.",
+      penalty: 0,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  const totalPenalty = finalEvents.reduce(
+    (sum, event) => sum + Number(event.penalty || 0),
+    0
+  );
+
+  const pilotRating = Math.max(
+    0,
+    Math.min(10, Number((10 - totalPenalty).toFixed(1)))
+  );
+
+  const hasPassengers = Number(mission.passengers || 0) > 0;
+  const hasCargo = Number(mission.cargo_weight_kg || 0) > 0;
+
+  const passengerSatisfaction = hasPassengers
+    ? Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 8)))
+    : null;
+
+  const cargoIntegrity = hasCargo
+    ? Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 7)))
+    : null;
+
+  let reputationChange = 0;
+
+  if (pilotRating >= 9) reputationChange = 3;
+  else if (pilotRating >= 8) reputationChange = 2;
+  else if (pilotRating >= 7) reputationChange = 1;
+  else if (pilotRating >= 6) reputationChange = 0;
+  else if (pilotRating >= 5) reputationChange = -1;
+  else if (pilotRating >= 4) reputationChange = -2;
+  else reputationChange = -4;
+
+  let xpMultiplier = 1;
+
+  if (pilotRating >= 9) xpMultiplier = 1.2;
+  else if (pilotRating >= 8) xpMultiplier = 1.1;
+  else if (pilotRating >= 7) xpMultiplier = 1;
+  else if (pilotRating >= 6) xpMultiplier = 0.9;
+  else if (pilotRating >= 5) xpMultiplier = 0.8;
+  else xpMultiplier = 0.6;
+
+  const finalXp = Math.max(0, Math.round(baseXp * xpMultiplier));
+
+  let landingImpactLevel = "normal";
+
+  if (finalEvents.some((event) => event.code === "hard_landing")) {
+    landingImpactLevel = "hard";
+  } else if (maxDescentRate < -500) {
+    landingImpactLevel = "firm";
+  }
+
+  return {
+    pilotRating,
+    passengerSatisfaction,
+    cargoIntegrity,
+    reputationChange,
+    xpBase: baseXp,
+    xpFinal: finalXp,
+    xpMultiplier,
+    landingImpactLevel,
+    flightEvents: finalEvents,
+    maxGForce,
+    maxBankAngle,
+    maxPitchAngle,
+    maxDescentRate,
+    landingSpeed,
+  };
+}
+
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
   const [password, setPassword] = useState(() => localStorage.getItem("northops_password") || "");
@@ -127,6 +262,7 @@ function App() {
   const [message, setMessage] = useState("Cliente iniciado.");
   const [canFinishFlight, setCanFinishFlight] = useState(false);
   const [cheatMessage, setCheatMessage] = useState("");
+  const [lastEvaluation, setLastEvaluation] = useState<any>(null);
 
   const [appVersion, setAppVersion] = useState("...");
   const [updateStatus, setUpdateStatus] = useState("Pronto");
@@ -138,6 +274,13 @@ function App() {
   const completingFlightRef = useRef(false);
   const fuelAtStartRef = useRef<number | null>(null);
   const cheatDetectedRef = useRef(false);
+
+  const flightEventsRef = useRef<any[]>([]);
+  const maxGForceRef = useRef(1);
+  const maxBankAngleRef = useRef(0);
+  const maxPitchAngleRef = useRef(0);
+  const maxDescentRateRef = useRef(0);
+  const landingSpeedRef = useRef(0);
 
   const [validationStatus, setValidationStatus] = useState({
     ok: false,
@@ -155,9 +298,13 @@ function App() {
       : Number(activeMission?.distance_nm || 0);
 
   const totalDistance = Number(activeMission?.distance_nm || 0);
+
   const progressPercent =
     totalDistance > 0
-      ? Math.min(100, Math.max(0, ((totalDistance - distanceToDestination) / totalDistance) * 100))
+      ? Math.min(
+          100,
+          Math.max(0, ((totalDistance - distanceToDestination) / totalDistance) * 100)
+        )
       : 0;
 
   useEffect(() => {
@@ -254,7 +401,10 @@ function App() {
     );
 
     if (distanceFromOrigin > 3) {
-      setValidationStatus({ ok: false, message: `Fora da origem: ${distanceFromOrigin.toFixed(1)} NM.` });
+      setValidationStatus({
+        ok: false,
+        message: `Fora da origem: ${distanceFromOrigin.toFixed(1)} NM.`,
+      });
       return;
     }
 
@@ -341,6 +491,60 @@ function App() {
       const currentFuelGal = Number(currentSimData.fuel_total_quantity || 0);
       const simRate = Number(currentSimData.sim_rate || 1);
 
+      const gForce = Math.abs(Number(currentSimData.g_force || 1));
+      const bankAngle = Math.abs(Number(currentSimData.bank_degrees || 0));
+      const pitchAngle = Math.abs(Number(currentSimData.pitch_degrees || 0));
+      const verticalSpeed = Number(currentSimData.vertical_speed || 0);
+      const airspeed = Number(currentSimData.airspeed_indicated || 0);
+
+      maxGForceRef.current = Math.max(maxGForceRef.current, gForce);
+      maxBankAngleRef.current = Math.max(maxBankAngleRef.current, bankAngle);
+      maxPitchAngleRef.current = Math.max(maxPitchAngleRef.current, pitchAngle);
+
+      if (verticalSpeed < maxDescentRateRef.current) {
+        maxDescentRateRef.current = verticalSpeed;
+      }
+
+      if (gForce > MAX_SAFE_G_FORCE) {
+        addFlightEvent(flightEventsRef, {
+          code: "high_g_force",
+          type: "warning",
+          title: "Força G elevada",
+          message: `Força G máxima detectada: ${gForce.toFixed(1)}G.`,
+          penalty: 1.5,
+        });
+      }
+
+      if (bankAngle > MAX_SAFE_BANK_ANGLE) {
+        addFlightEvent(flightEventsRef, {
+          code: "aggressive_turn",
+          type: "warning",
+          title: "Curva agressiva",
+          message: `Inclinação lateral detectada: ${bankAngle.toFixed(0)}°.`,
+          penalty: 1,
+        });
+      }
+
+      if (pitchAngle > MAX_SAFE_PITCH_ANGLE) {
+        addFlightEvent(flightEventsRef, {
+          code: "aggressive_pitch",
+          type: "warning",
+          title: "Atitude brusca da aeronave",
+          message: `Ângulo de pitch elevado detectado: ${pitchAngle.toFixed(0)}°.`,
+          penalty: 1,
+        });
+      }
+
+      if (verticalSpeed < MAX_SAFE_DESCENT_RATE) {
+        addFlightEvent(flightEventsRef, {
+          code: "hard_descent",
+          type: "warning",
+          title: "Descida agressiva",
+          message: `Razão de descida detectada: ${Math.round(verticalSpeed)} ft/min.`,
+          penalty: 1,
+        });
+      }
+
       if (
         fuelAtStartRef.current !== null &&
         currentFuelGal > fuelAtStartRef.current + FUEL_TOLERANCE_GAL
@@ -386,6 +590,33 @@ function App() {
       if (!destinationAirport) return;
 
       const isLanded = payload.sim_on_ground === true && payload.ground_speed < 30;
+
+      if (isLanded) {
+        landingSpeedRef.current = Math.max(
+          landingSpeedRef.current,
+          Number(airspeed || payload.ground_speed || 0)
+        );
+
+        if (verticalSpeed < HARD_LANDING_DESCENT_RATE) {
+          addFlightEvent(flightEventsRef, {
+            code: "hard_landing",
+            type: "danger",
+            title: "Pouso duro",
+            message: `Impacto no pouso com razão vertical de ${Math.round(verticalSpeed)} ft/min.`,
+            penalty: 2,
+          });
+        }
+
+        if (airspeed > HIGH_LANDING_SPEED) {
+          addFlightEvent(flightEventsRef, {
+            code: "high_landing_speed",
+            type: "warning",
+            title: "Velocidade alta no pouso",
+            message: `Velocidade indicada no pouso: ${Math.round(airspeed)} kt.`,
+            penalty: 1,
+          });
+        }
+      }
 
       if (!isLanded) {
         landingStartedAtRef.current = null;
@@ -463,7 +694,10 @@ function App() {
       setDestinationAirport(destinationData);
     }
 
-    if (data.client_status === "in_flight") setTelemetryStarted(true);
+    if (data.client_status === "in_flight") {
+      setTelemetryStarted(true);
+    }
+
     setMessage("Missão ativa carregada.");
   }
 
@@ -472,7 +706,10 @@ function App() {
     setLoading(true);
     setMessage("Conectando ao NORTH OPS...");
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (error || !data.user) {
       setMessage("E-mail ou senha inválidos.");
@@ -525,7 +762,15 @@ function App() {
           : Number(simDataRef.current?.fuel_total_quantity || 0);
 
       cheatDetectedRef.current = false;
+      flightEventsRef.current = [];
+      maxGForceRef.current = 1;
+      maxBankAngleRef.current = 0;
+      maxPitchAngleRef.current = 0;
+      maxDescentRateRef.current = 0;
+      landingSpeedRef.current = 0;
+
       setCheatMessage("");
+      setLastEvaluation(null);
     } catch (error: any) {
       setMessage(
         `Erro ao aplicar combustível na aeronave: ${
@@ -579,7 +824,7 @@ function App() {
 
     const { data: profileData } = await supabaseClient
       .from("profiles")
-      .select("xp, level, is_premium")
+      .select("xp, level, is_premium, reputation")
       .eq("id", user.id)
       .single();
 
@@ -587,9 +832,33 @@ function App() {
     const currentLevel = Number(profileData?.level || 1);
     const isPremium = Boolean(profileData?.is_premium || false);
 
-    const earnedXp = calculateFlightXp(activeMission);
+    const baseXp = calculateFlightXp(activeMission);
+
+    const currentSimData = simDataRef.current;
+    const remainingFuelPercent = Math.round(getFuelPercent(currentSimData));
+    const safeRemainingFuel = Math.min(100, Math.max(0, remainingFuelPercent));
+
+    const evaluation = calculatePilotEvaluation({
+      mission: activeMission,
+      events: flightEventsRef.current,
+      baseXp,
+      remainingFuelPercent: safeRemainingFuel,
+      maxGForce: Number(maxGForceRef.current || 1),
+      maxBankAngle: Number(maxBankAngleRef.current || 0),
+      maxPitchAngle: Number(maxPitchAngleRef.current || 0),
+      maxDescentRate: Number(maxDescentRateRef.current || 0),
+      landingSpeed: Number(landingSpeedRef.current || 0),
+    });
+
+    const earnedXp = evaluation.xpFinal;
     const newXp = currentXp + earnedXp;
     const newLevel = getLevelFromXp(newXp);
+
+    const currentReputation = Number(profileData?.reputation || 100);
+    const newReputation = Math.max(
+      0,
+      Math.min(100, currentReputation + evaluation.reputationChange)
+    );
 
     const basePayment = Number(activeMission.payment || 0);
     const paymentBonus = getPaymentBonus(currentLevel, isPremium);
@@ -610,6 +879,20 @@ function App() {
       flight_hours: Number(flightHours.toFixed(2)),
       xp_earned: earnedXp,
       level_after: newLevel,
+
+      pilot_rating: evaluation.pilotRating,
+      passenger_satisfaction: evaluation.passengerSatisfaction,
+      cargo_integrity: evaluation.cargoIntegrity,
+      reputation_change: evaluation.reputationChange,
+      xp_base: evaluation.xpBase,
+      xp_final: evaluation.xpFinal,
+      flight_events: evaluation.flightEvents,
+      landing_impact_level: evaluation.landingImpactLevel,
+      max_g_force: evaluation.maxGForce,
+      max_bank_angle: evaluation.maxBankAngle,
+      max_pitch_angle: evaluation.maxPitchAngle,
+      max_descent_rate: evaluation.maxDescentRate,
+      landing_speed_kt: evaluation.landingSpeed,
     });
 
     if (logError) {
@@ -637,6 +920,31 @@ function App() {
       return;
     }
 
+    const { data: activeFleet } = await supabaseClient
+      .from("pilot_fleet")
+      .select("id, fuel, total_hours, total_flights, total_revenue")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (activeFleet) {
+      const { error: fleetError } = await supabaseClient
+        .from("pilot_fleet")
+        .update({
+          fuel: safeRemainingFuel,
+          total_hours: Number(activeFleet.total_hours || 0) + Number(flightHours.toFixed(2)),
+          total_flights: Number(activeFleet.total_flights || 0) + 1,
+          total_revenue: Number(activeFleet.total_revenue || 0) + finalPayment,
+        })
+        .eq("id", activeFleet.id);
+
+      if (fleetError) {
+        setMessage(`Erro ao atualizar aeronave: ${fleetError.message}`);
+        completingFlightRef.current = false;
+        return;
+      }
+    }
+
     const { error: missionError } = await supabaseClient
       .from("active_missions")
       .update({
@@ -659,8 +967,18 @@ function App() {
         current_airport: activeMission.destination,
         xp: newXp,
         level: newLevel,
+        reputation: newReputation,
       })
       .eq("id", user.id);
+
+    setLastEvaluation({
+      ...evaluation,
+      payment: finalPayment,
+      xpEarned: earnedXp,
+      reputationBefore: currentReputation,
+      reputationAfter: newReputation,
+      remainingFuelPercent: safeRemainingFuel,
+    });
 
     setActiveMission(null);
     setOriginAirport(null);
@@ -671,13 +989,23 @@ function App() {
     landingStartedAtRef.current = null;
     completingFlightRef.current = false;
     fuelAtStartRef.current = null;
+    cheatDetectedRef.current = false;
+
+    flightEventsRef.current = [];
+    maxGForceRef.current = 1;
+    maxBankAngleRef.current = 0;
+    maxPitchAngleRef.current = 0;
+    maxDescentRateRef.current = 0;
+    landingSpeedRef.current = 0;
 
     await loadActiveMission(user.id);
 
     const levelText = newLevel > currentLevel ? ` Subiu para o nível ${newLevel}!` : "";
 
     setMessage(
-      `Voo finalizado. Pagamento: $${finalPayment.toLocaleString("pt-BR")}. +${earnedXp} XP.${levelText}`
+      `Voo finalizado. Nota: ${evaluation.pilotRating}/10. XP: +${earnedXp}. Reputação: ${
+        evaluation.reputationChange >= 0 ? "+" : ""
+      }${evaluation.reputationChange}. Pagamento: $${finalPayment.toLocaleString("pt-BR")}.${levelText}`
     );
   }
 
@@ -702,10 +1030,19 @@ function App() {
     setTelemetryStarted(false);
     setCanFinishFlight(false);
     setCheatMessage("");
+    setLastEvaluation(null);
+
     landingStartedAtRef.current = null;
     completingFlightRef.current = false;
     fuelAtStartRef.current = null;
     cheatDetectedRef.current = false;
+
+    flightEventsRef.current = [];
+    maxGForceRef.current = 1;
+    maxBankAngleRef.current = 0;
+    maxPitchAngleRef.current = 0;
+    maxDescentRateRef.current = 0;
+    landingSpeedRef.current = 0;
 
     setActiveMission({
       ...activeMission,
@@ -760,11 +1097,28 @@ function App() {
           <h2>Login do piloto</h2>
 
           <form onSubmit={handleLogin} className="login-form">
-            <input type="email" placeholder="E-mail do piloto" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input
+              type="email"
+              placeholder="E-mail do piloto"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+
+            <input
+              type="password"
+              placeholder="Senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
 
             <label className="remember-login">
-              <input type="checkbox" checked={rememberLogin} onChange={(e) => setRememberLogin(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={rememberLogin}
+                onChange={(e) => setRememberLogin(e.target.checked)}
+              />
               Lembrar login
             </label>
 
@@ -791,11 +1145,7 @@ function App() {
               {validationStatus.message}
             </div>
 
-            {cheatMessage && (
-              <div className="cheat-alert">
-                {cheatMessage}
-              </div>
-            )}
+            {cheatMessage && <div className="cheat-alert">{cheatMessage}</div>}
 
             <div className="actions">
               <button onClick={() => loadActiveMission(user.id)}>Atualizar</button>
@@ -836,8 +1186,19 @@ function App() {
             <Metric label="Motor" value={simData?.engine_running ? "Ligado" : "Desligado"} />
             <Metric label="Peso Pax" value={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`} />
             <Metric label="Peso Carga" value={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`} />
-            <Metric label="Fuel Planejado" value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`} />
+            <Metric
+              label="Fuel Planejado"
+              value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
+            />
             <Metric label="Peso Decolagem" value={`${Math.round(activeMission.takeoff_weight_kg || 0)} kg`} />
+            <Metric
+              label="G Máx."
+              value={`${Number(maxGForceRef.current || 1).toFixed(1)}G`}
+            />
+            <Metric
+              label="Inclinação Máx."
+              value={`${Math.round(maxBankAngleRef.current || 0)}°`}
+            />
             <Metric
               label="Pagamento"
               value={`$${activeMission.payment?.toLocaleString("pt-BR")}`}
@@ -851,6 +1212,58 @@ function App() {
         <section className="login-card">
           <h2>Nenhuma missão ativa</h2>
           <p>Aceite uma missão no site NORTH OPS.</p>
+
+          {lastEvaluation && (
+            <div className="status-message">
+              <h3>Avaliação do último voo</h3>
+
+              <p>
+                Nota de pilotagem: <strong>{lastEvaluation.pilotRating}/10</strong>
+              </p>
+
+              {lastEvaluation.passengerSatisfaction !== null && (
+                <p>
+                  Satisfação dos passageiros:{" "}
+                  <strong>{lastEvaluation.passengerSatisfaction}%</strong>
+                </p>
+              )}
+
+              {lastEvaluation.cargoIntegrity !== null && (
+                <p>
+                  Integridade da carga: <strong>{lastEvaluation.cargoIntegrity}%</strong>
+                </p>
+              )}
+
+              <p>
+                Reputação:{" "}
+                <strong>
+                  {lastEvaluation.reputationChange >= 0 ? "+" : ""}
+                  {lastEvaluation.reputationChange}
+                </strong>
+              </p>
+
+              <p>
+                XP recebido: <strong>+{lastEvaluation.xpEarned}</strong>
+              </p>
+
+              <p>
+                Combustível restante:{" "}
+                <strong>{lastEvaluation.remainingFuelPercent}%</strong>
+              </p>
+
+              <div style={{ marginTop: 12 }}>
+                <strong>Eventos:</strong>
+
+                {lastEvaluation.flightEvents?.map((event: any) => (
+                  <p key={event.code}>
+                    {event.type === "positive" ? "✅" : event.type === "danger" ? "🔴" : "⚠️"}{" "}
+                    {event.title}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button onClick={() => loadActiveMission(user.id)}>Atualizar missão</button>
         </section>
       )}
@@ -885,12 +1298,7 @@ function Metric({
 }
 
 function FuelMetric({ fuel }: { fuel: number }) {
-  const color =
-    fuel > 60
-      ? "#22c55e"
-      : fuel > 30
-      ? "#facc15"
-      : "#ef4444";
+  const color = fuel > 60 ? "#22c55e" : fuel > 30 ? "#facc15" : "#ef4444";
 
   return (
     <div className="metric fuel-metric">
