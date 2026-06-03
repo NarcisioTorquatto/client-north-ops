@@ -20,19 +20,21 @@ function sendToRenderer(channel, data) {
 }
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 1000,
-    minHeight: 700,
-    backgroundColor: "#020817",
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+mainWindow = new BrowserWindow({
+  width: 1200,
+  height: 800,
+  minWidth: 1000,
+  minHeight: 700,
+  backgroundColor: "#020817",
 
+  icon: path.join(__dirname, "../resources/icon.ico"),
+
+  webPreferences: {
+    preload: path.join(__dirname, "preload.cjs"),
+    contextIsolation: true,
+    nodeIntegration: false,
+  },
+});  
   if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools();
@@ -40,6 +42,8 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 }
+
+
 
 function getBridgePath() {
   if (isDev) {

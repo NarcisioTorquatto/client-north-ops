@@ -1,6 +1,6 @@
 {
   "name": "north-ops-client",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "private": true,
   "author": "North Ops",
   "main": "electron/main.cjs",
@@ -39,17 +39,30 @@
     "vite": "^8.0.12",
     "wait-on": "^9.0.10"
   },
+
+
 "build": {
   "appId": "com.northops.client",
   "productName": "NORTH OPS Client",
+
   "directories": {
     "output": "release"
   },
+
+  "icon": "resources/icon.ico",
+
+  "win": {
+    "target": "nsis",
+    "icon": "resources/icon.ico"
+  },
+
   "files": [
     "dist/**/*",
     "electron/**/*",
     "package.json"
   ],
+
+
 "extraResources": [
   {
     "from": "resources/bridge",
@@ -57,9 +70,7 @@
   }
     
   ],
-  "win": {
-    "target": "nsis"
-  },
+  
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
