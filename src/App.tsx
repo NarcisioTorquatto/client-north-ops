@@ -6,10 +6,10 @@ const FUEL_CHEAT_FINE = 15000;
 const SIM_RATE_CHEAT_FINE = 25000;
 const FUEL_TOLERANCE_GAL = 3;
 
-const MAX_SAFE_G_FORCE = 2.2;
-const MAX_SAFE_BANK_ANGLE = 45;
-const MAX_SAFE_PITCH_ANGLE = 20;
-const MAX_SAFE_DESCENT_RATE = -1200;
+const MAX_SAFE_G_FORCE = 1.7;
+const MAX_SAFE_BANK_ANGLE = 50;
+const MAX_SAFE_PITCH_ANGLE = 25;
+const MAX_SAFE_DESCENT_RATE = -1500;
 const HARD_LANDING_DESCENT_RATE = -700;
 const HIGH_LANDING_SPEED = 95;
 
@@ -45,22 +45,65 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
   const mission = normalizeAircraftName(missionAircraft);
   const sim = normalizeAircraftName(simAircraft);
 
-  const aircraftAliases: Record<string, string[]> = {
-    cessna172skyhawk: ["c172", "c172sp", "skyhawk"],
-    kodiak100: ["kodiak100", "kodiak"],
-    cessna208bgrandcaravan: ["c208", "c208b", "caravan", "grandcaravan"],
-    beechcraftbarong58: ["barong58", "g58", "baron"],
-    beechcraftbonanzag36: ["bonanzag36", "g36", "bonanza"],
-    embraere110bandeirante: ["e110", "bandeirante", "embraere110"],
-  };
+  const aircraftGroups = [
+    [
+      "cessna172skyhawk",
+      "cessna172",
+      "c172",
+      "c172sp",
+      "skyhawk",
+    ],
+    [
+      "kodiak100",
+      "kodiak",
+      "questkodiak",
+    ],
+    [
+      "cessna208bgrandcaravan",
+      "cessna208",
+      "cessna208b",
+      "c208",
+      "c208b",
+      "caravan",
+      "grandcaravan",
+    ],
+    [
+      "beechcraftbarong58",
+      "beechcraftbaron",
+      "barong58",
+      "baron58",
+      "baron58tc",
+      "58tc",
+      "g58",
+      "baron",
+      "blacksquarebaron",
+      "blacksquarebaron58tc",
+    ],
+    [
+      "beechcraftbonanzag36",
+      "beechcraftbonanza",
+      "bonanzag36",
+      "g36",
+      "bonanza",
+    ],
+    [
+      "embraere110bandeirante",
+      "embraere110",
+      "e110",
+      "bandeirante",
+      "embraerbandeirante",
+    ],
+  ];
 
-  const aliases = aircraftAliases[mission];
+  const matchedGroup = aircraftGroups.find((group) =>
+    group.some((alias) => mission.includes(alias) || alias.includes(mission))
+  );
 
-  if (!aliases) {
+  if (!matchedGroup) {
     return sim.includes(mission) || mission.includes(sim);
   }
 
-  return aliases.some((alias) => sim.includes(alias));
+  return matchedGroup.some((alias) => sim.includes(alias));
 }
 
 function getFuelPercent(simData: any) {
@@ -81,8 +124,9 @@ function getFuelPercent(simData: any) {
 }
 
 function getXpRequiredForLevel(level: number) {
-  return Math.floor(level * level * 120);
+  return Math.floor(level * level * 350);
 }
+
 
 function getLevelFromXp(xp: number) {
   let level = 1;
@@ -95,16 +139,18 @@ function getLevelFromXp(xp: number) {
 }
 
 function calculateFlightXp(mission: any) {
-  let xp = Math.round(Number(mission.distance_nm || 0) * 2);
+  const distance = Number(mission.distance_nm || 0);
 
-  xp += 100;
+  let xp = Math.round(distance * 0.8);
 
-  if (mission.is_remote) xp += 100;
+  xp += 40;
 
-  if (mission.risk === "Alto") xp += 150;
-  if (mission.risk === "Médio") xp += 75;
+  if (mission.is_remote) xp += 35;
 
-  return xp;
+  if (mission.risk === "Alto") xp += 60;
+  if (mission.risk === "Médio") xp += 30;
+
+  return Math.max(30, xp);
 }
 
 function getPaymentBonus(level: number, isPremium: boolean) {
@@ -268,6 +314,9 @@ function App() {
   const [updateStatus, setUpdateStatus] = useState("Pronto");
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updatePercent, setUpdatePercent] = useState(0);
+
+  const [maxGDisplay, setMaxGDisplay] = useState(1);
+  const [maxBankDisplay, setMaxBankDisplay] = useState(0);
 
   const simDataRef = useRef<any>(null);
   const landingStartedAtRef = useRef<number | null>(null);
@@ -491,15 +540,26 @@ function App() {
       const currentFuelGal = Number(currentSimData.fuel_total_quantity || 0);
       const simRate = Number(currentSimData.sim_rate || 1);
 
-      const gForce = Math.abs(Number(currentSimData.g_force || 1));
-      const bankAngle = Math.abs(Number(currentSimData.bank_degrees || 0));
-      const pitchAngle = Math.abs(Number(currentSimData.pitch_degrees || 0));
+      const rawGForce = Number(currentSimData.g_force || 1);
+      const gForce = Math.abs(rawGForce);
+      const displayGForce = rawGForce < 0 ? Math.abs(rawGForce) : rawGForce;
+
+      const rawBank = Math.abs(Number(currentSimData.bank_degrees || 0));
+      const rawPitch = Math.abs(Number(currentSimData.pitch_degrees || 0));
+
+      const bankAngle = rawBank <= Math.PI ? rawBank * (180 / Math.PI) : rawBank;
+      const pitchAngle = rawPitch <= Math.PI ? rawPitch * (180 / Math.PI) : rawPitch;
+
+
       const verticalSpeed = Number(currentSimData.vertical_speed || 0);
       const airspeed = Number(currentSimData.airspeed_indicated || 0);
 
-      maxGForceRef.current = Math.max(maxGForceRef.current, gForce);
+      maxGForceRef.current = Math.max(maxGForceRef.current, displayGForce);
       maxBankAngleRef.current = Math.max(maxBankAngleRef.current, bankAngle);
       maxPitchAngleRef.current = Math.max(maxPitchAngleRef.current, pitchAngle);
+
+      setMaxGDisplay(maxGForceRef.current);
+      setMaxBankDisplay(maxBankAngleRef.current);
 
       if (verticalSpeed < maxDescentRateRef.current) {
         maxDescentRateRef.current = verticalSpeed;
@@ -511,7 +571,7 @@ function App() {
           type: "warning",
           title: "Força G elevada",
           message: `Força G máxima detectada: ${gForce.toFixed(1)}G.`,
-          penalty: 1.5,
+          penalty: 2.5,
         });
       }
 
@@ -521,7 +581,7 @@ function App() {
           type: "warning",
           title: "Curva agressiva",
           message: `Inclinação lateral detectada: ${bankAngle.toFixed(0)}°.`,
-          penalty: 1,
+          penalty: 1.5,
         });
       }
 
@@ -531,7 +591,7 @@ function App() {
           type: "warning",
           title: "Atitude brusca da aeronave",
           message: `Ângulo de pitch elevado detectado: ${pitchAngle.toFixed(0)}°.`,
-          penalty: 1,
+          penalty: 1.5,
         });
       }
 
@@ -541,7 +601,7 @@ function App() {
           type: "warning",
           title: "Descida agressiva",
           message: `Razão de descida detectada: ${Math.round(verticalSpeed)} ft/min.`,
-          penalty: 1,
+          penalty: 2,
         });
       }
 
@@ -578,7 +638,14 @@ function App() {
         aircraft: currentSimData.aircraft,
         sim_on_ground: Boolean(currentSimData.on_ground),
         engine_running: Boolean(currentSimData.engine_running),
+
+        g_force: Number(gForce),
+        bank_degrees: Number(bankAngle),
+        pitch_degrees: Number(pitchAngle),
+        vertical_speed: Number(verticalSpeed),
+        airspeed_indicated: Number(airspeed),
       };
+
 
       const { error } = await supabaseClient.from("flight_telemetry").insert(payload);
 
@@ -603,7 +670,7 @@ function App() {
             type: "danger",
             title: "Pouso duro",
             message: `Impacto no pouso com razão vertical de ${Math.round(verticalSpeed)} ft/min.`,
-            penalty: 2,
+            penalty: 3,
           });
         }
 
@@ -613,7 +680,7 @@ function App() {
             type: "warning",
             title: "Velocidade alta no pouso",
             message: `Velocidade indicada no pouso: ${Math.round(airspeed)} kt.`,
-            penalty: 1,
+            penalty: 1.5,
           });
         }
       }
@@ -769,6 +836,8 @@ function App() {
       maxDescentRateRef.current = 0;
       landingSpeedRef.current = 0;
 
+      setMaxGDisplay(1);
+      setMaxBankDisplay(0);
       setCheatMessage("");
       setLastEvaluation(null);
     } catch (error: any) {
@@ -961,6 +1030,23 @@ function App() {
       return;
     }
 
+    const { data: profileStats } = await supabaseClient
+      .from("profiles")
+      .select("average_rating, evaluated_flights")
+      .eq("id", user.id)
+      .single();
+
+    const currentAverage = Number(profileStats?.average_rating || 10);
+    const currentFlights = Number(profileStats?.evaluated_flights || 0);
+
+    const newAverage =
+      currentFlights === 0
+        ? evaluation.pilotRating
+        : (
+            (currentAverage * currentFlights + evaluation.pilotRating) /
+            (currentFlights + 1)
+          );
+
     await supabaseClient
       .from("profiles")
       .update({
@@ -968,9 +1054,12 @@ function App() {
         xp: newXp,
         level: newLevel,
         reputation: newReputation,
+        average_rating: Number(newAverage.toFixed(2)),
+        evaluated_flights: currentFlights + 1,
       })
       .eq("id", user.id);
 
+      
     setLastEvaluation({
       ...evaluation,
       payment: finalPayment,
@@ -998,6 +1087,9 @@ function App() {
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
 
+    setMaxGDisplay(1);
+    setMaxBankDisplay(0);
+
     await loadActiveMission(user.id);
 
     const levelText = newLevel > currentLevel ? ` Subiu para o nível ${newLevel}!` : "";
@@ -1005,7 +1097,7 @@ function App() {
     setMessage(
       `Voo finalizado. Nota: ${evaluation.pilotRating}/10. XP: +${earnedXp}. Reputação: ${
         evaluation.reputationChange >= 0 ? "+" : ""
-      }${evaluation.reputationChange}. Pagamento: $${finalPayment.toLocaleString("pt-BR")}.${levelText}`
+      }${evaluation.reputationChange}. Pagamento: ${finalPayment.toLocaleString("pt-BR")} NOC.${levelText}`
     );
   }
 
@@ -1043,6 +1135,9 @@ function App() {
     maxPitchAngleRef.current = 0;
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
+
+    setMaxGDisplay(1);
+    setMaxBankDisplay(0);
 
     setActiveMission({
       ...activeMission,
@@ -1191,17 +1286,11 @@ function App() {
               value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
             />
             <Metric label="Peso Decolagem" value={`${Math.round(activeMission.takeoff_weight_kg || 0)} kg`} />
-            <Metric
-              label="G Máx."
-              value={`${Number(maxGForceRef.current || 1).toFixed(1)}G`}
-            />
-            <Metric
-              label="Inclinação Máx."
-              value={`${Math.round(maxBankAngleRef.current || 0)}°`}
-            />
+            <Metric label="G Máx." value={`${Number(maxGDisplay || 1).toFixed(1)}G`} />
+            <Metric label="Inclinação Máx." value={`${Math.round(maxBankDisplay || 0)}°`} />
             <Metric
               label="Pagamento"
-              value={`$${activeMission.payment?.toLocaleString("pt-BR")}`}
+              value={`${activeMission.payment?.toLocaleString("pt-BR")} NOC`}
               className="payment-card"
             />
           </div>

@@ -1,7 +1,38 @@
+import os
+import sys
 import time
 import json
-import sys
 import threading
+
+
+def prepare_simconnect_dll_path():
+    possible_paths = []
+
+    if getattr(sys, "frozen", False):
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+
+        possible_paths.extend([
+            base_path,
+            os.path.join(base_path, "SimConnect"),
+            os.path.join(base_path, "simconnect"),
+        ])
+
+    possible_paths.extend([
+        os.getcwd(),
+        os.path.dirname(os.path.abspath(__file__)),
+    ])
+
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                os.add_dll_directory(path)
+            except Exception:
+                pass
+
+            os.environ["PATH"] = path + os.pathsep + os.environ.get("PATH", "")
+
+
+prepare_simconnect_dll_path()
 
 from SimConnect import SimConnect, AircraftRequests
 
@@ -221,7 +252,6 @@ def main():
                 ground_speed = read_var("GROUND_VELOCITY")
                 heading = read_var("PLANE_HEADING_DEGREES_TRUE")
 
-                # Dados para avaliação de pilotagem
                 g_force = read_var("G_FORCE")
                 bank_degrees = read_var("PLANE_BANK_DEGREES")
                 pitch_degrees = read_var("PLANE_PITCH_DEGREES")
@@ -235,7 +265,7 @@ def main():
                 on_ground = read_var("SIM_ON_GROUND")
                 engine_running = read_var("GENERAL_ENG_COMBUSTION:1")
 
-                data = {
+                send({
                     "connected": True,
                     "aircraft": aircraft,
                     "latitude": latitude,
@@ -243,22 +273,19 @@ def main():
                     "altitude_ft": altitude_ft,
                     "ground_speed": ground_speed,
                     "heading": heading,
-
                     "g_force": g_force,
                     "bank_degrees": bank_degrees,
                     "pitch_degrees": pitch_degrees,
                     "vertical_speed": vertical_speed,
                     "airspeed_indicated": airspeed_indicated,
-
                     "fuel_percent": fuel_percent,
                     "fuel_total_quantity": fuel_total_quantity,
                     "fuel_total_capacity": fuel_total_capacity,
                     "sim_rate": sim_rate,
                     "on_ground": bool(on_ground),
                     "engine_running": bool(engine_running),
-                }
+                })
 
-                send(data)
                 time.sleep(2)
 
         except Exception as e:
@@ -270,13 +297,11 @@ def main():
                 "altitude_ft": None,
                 "ground_speed": None,
                 "heading": None,
-
                 "g_force": None,
                 "bank_degrees": None,
                 "pitch_degrees": None,
                 "vertical_speed": None,
                 "airspeed_indicated": None,
-
                 "fuel_percent": None,
                 "fuel_total_quantity": None,
                 "fuel_total_capacity": None,
