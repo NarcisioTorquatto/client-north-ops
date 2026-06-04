@@ -402,3 +402,27 @@ button.danger {
 .update-box small {
   color: #94a3b8;
 }
+
+.update-required-alert {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.update-required-alert strong {
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
+.update-required-alert span {
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 600;
+}

@@ -456,26 +456,16 @@ function App() {
       });
       return;
     }
-    {updateState === "downloaded" && (
-      <div
-        style={{
-          background: "rgba(239,68,68,0.15)",
-          border: "1px solid rgba(239,68,68,0.4)",
-          borderRadius: "14px",
-          padding: "14px",
-          marginBottom: "12px",
-          color: "#ff6b6b",
-          fontWeight: 800,
-          textAlign: "center",
-        }}
-      >
-        ⚠️ ATUALIZAÇÃO OBRIGATÓRIA DISPONÍVEL<br />
-        Clique em "Reiniciar e instalar" para continuar.
-      </div>
-    )}
+    if (updateState === "downloaded") {
+      setValidationStatus({
+        ok: false,
+        message: "Atualização obrigatória pendente. Clique em Reiniciar e instalar.",
+      });
+      return;
+    }
 
     setValidationStatus({ ok: true, message: "Tudo OK. Pronto para iniciar." });
-  }, [activeMission, simData, originAirport]);
+  }, [activeMission, simData, originAirport, updateState]);
 
   async function handleUpdateButton() {
     try {
@@ -832,6 +822,11 @@ function App() {
   async function handleStartFlight() {
     if (!activeMission) return;
 
+    if (updateState === "downloaded") {
+      setMessage("Atualização obrigatória pendente. Clique em Reiniciar e instalar.");
+      return;
+    }
+
     if (!validationStatus.ok) {
       setMessage(validationStatus.message);
       return;
@@ -911,6 +906,12 @@ function App() {
 
   async function handleFinishFlight() {
     if (!activeMission || !user || !canFinishFlight) return;
+
+    if (updateState === "downloaded") {
+      setMessage("Atualização obrigatória pendente. Clique em Reiniciar e instalar.");
+      return;
+    }
+
     if (completingFlightRef.current) return;
 
     completingFlightRef.current = true;
@@ -1212,35 +1213,11 @@ function App() {
             {updateState === "available" && "Atualizar agora"}
             {updateState === "downloading" && `Baixando ${updatePercent}%`}
             {updateState === "downloaded" && "Reiniciar e instalar"}
-            {(updateState === "idle" ||
-              updateState === "none" ||
-              updateState === "error") &&
+            {(updateState === "idle" || updateState === "none" || updateState === "error") &&
               "Verificar atualização"}
           </button>
 
           <small>{updateStatus}</small>
-
-          {updateState === "downloaded" && (
-            <div
-              style={{
-                marginTop: "10px",
-                padding: "10px",
-                borderRadius: "10px",
-                background: "rgba(239,68,68,0.15)",
-                border: "1px solid rgba(239,68,68,0.4)",
-                color: "#ff6b6b",
-                fontWeight: 700,
-                fontSize: "12px",
-                textAlign: "center",
-              }}
-            >
-              ⚠️ Atualização obrigatória disponível.
-              <br />
-              Clique em <b>Reiniciar e instalar</b>.
-              <br />
-              O cliente permanecerá bloqueado até a atualização ser instalada.
-            </div>
-          )}
         </div>
       </header>
 
@@ -1293,8 +1270,19 @@ function App() {
 
             <div className="status-message">{message}</div>
 
+            {updatePendingInstall && (
+              <div className="update-required-alert">
+                <strong>⚠️ Atualização obrigatória disponível</strong>
+                <span>
+                  Clique em "Reiniciar e instalar" no canto superior direito para continuar.
+                </span>
+              </div>
+            )}
+
             <div className={validationStatus.ok ? "validation ok" : "validation error"}>
-              {validationStatus.message}
+              {updatePendingInstall
+                ? "Cliente bloqueado até a atualização ser instalada."
+                : validationStatus.message}
             </div>
 
             {cheatMessage && <div className="cheat-alert">{cheatMessage}</div>}
@@ -1313,8 +1301,11 @@ function App() {
                 {updatePendingInstall ? "Atualização obrigatória" : "Voar agora"}
               </button>
 
-              <button onClick={handleFinishFlight} disabled={!canFinishFlight}>
-                Finalizar voo
+              <button
+                onClick={handleFinishFlight}
+                disabled={updatePendingInstall || !canFinishFlight}
+              >
+                {updatePendingInstall ? "Atualização obrigatória" : "Finalizar voo"}
               </button>
 
               <button className="danger" onClick={handleResetFlight}>
