@@ -456,6 +456,23 @@ function App() {
       });
       return;
     }
+    {updateState === "downloaded" && (
+      <div
+        style={{
+          background: "rgba(239,68,68,0.15)",
+          border: "1px solid rgba(239,68,68,0.4)",
+          borderRadius: "14px",
+          padding: "14px",
+          marginBottom: "12px",
+          color: "#ff6b6b",
+          fontWeight: 800,
+          textAlign: "center",
+        }}
+      >
+        ⚠️ ATUALIZAÇÃO OBRIGATÓRIA DISPONÍVEL<br />
+        Clique em "Reiniciar e instalar" para continuar.
+      </div>
+    )}
 
     setValidationStatus({ ok: true, message: "Tudo OK. Pronto para iniciar." });
   }, [activeMission, simData, originAirport]);
@@ -1195,11 +1212,35 @@ function App() {
             {updateState === "available" && "Atualizar agora"}
             {updateState === "downloading" && `Baixando ${updatePercent}%`}
             {updateState === "downloaded" && "Reiniciar e instalar"}
-            {(updateState === "idle" || updateState === "none" || updateState === "error") &&
+            {(updateState === "idle" ||
+              updateState === "none" ||
+              updateState === "error") &&
               "Verificar atualização"}
           </button>
 
           <small>{updateStatus}</small>
+
+          {updateState === "downloaded" && (
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "10px",
+                borderRadius: "10px",
+                background: "rgba(239,68,68,0.15)",
+                border: "1px solid rgba(239,68,68,0.4)",
+                color: "#ff6b6b",
+                fontWeight: 700,
+                fontSize: "12px",
+                textAlign: "center",
+              }}
+            >
+              ⚠️ Atualização obrigatória disponível.
+              <br />
+              Clique em <b>Reiniciar e instalar</b>.
+              <br />
+              O cliente permanecerá bloqueado até a atualização ser instalada.
+            </div>
+          )}
         </div>
       </header>
 
