@@ -10,7 +10,7 @@ let mainWindow;
 let pythonProcess;
 const pendingCommands = new Map();
 
-autoUpdater.autoDownload = false;
+autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 function sendToRenderer(channel, data) {
@@ -144,11 +144,14 @@ function setupUpdater() {
 
   autoUpdater.on("update-available", (info) => {
     sendToRenderer("update-status", {
-      status: "available",
+      status: "downloading",
       version: info.version,
-      message: `Nova versão disponível: v${info.version}`,
+      percent: 0,
+      message: `Nova versão encontrada: v${info.version}. Baixando automaticamente...`,
     });
   });
+
+
 
   autoUpdater.on("update-not-available", () => {
     sendToRenderer("update-status", {

@@ -794,10 +794,23 @@ function App() {
       localStorage.removeItem("northops_remember_login");
     }
 
+    setMessage("Verificando atualizações do cliente...");
+
+    if (window.northOps?.checkForUpdates) {
+      try {
+        await window.northOps.checkForUpdates();
+      } catch {
+        setMessage("Não foi possível verificar atualizações. Continuando login...");
+      }
+    }
+
     setUser(data.user);
     await loadActiveMission(data.user.id);
-    setLoading(false);
+    setLoading(false); 
+ 
+ 
   }
+  
 
   async function handleStartFlight() {
     if (!activeMission) return;
@@ -1001,7 +1014,10 @@ function App() {
         .from("pilot_fleet")
         .update({
           fuel: safeRemainingFuel,
-          total_hours: Number(activeFleet.total_hours || 0) + Number(flightHours.toFixed(2)),
+          current_airport: activeMission.destination,
+          total_hours:
+            Number(activeFleet.total_hours || 0) +
+            Number(flightHours.toFixed(2)),
           total_flights: Number(activeFleet.total_flights || 0) + 1,
           total_revenue: Number(activeFleet.total_revenue || 0) + finalPayment,
         })
@@ -1050,7 +1066,6 @@ function App() {
     await supabaseClient
       .from("profiles")
       .update({
-        current_airport: activeMission.destination,
         xp: newXp,
         level: newLevel,
         reputation: newReputation,
