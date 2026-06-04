@@ -1269,7 +1269,7 @@ function App() {
                   activeMission.client_status === "in_flight"
                 }
               >
-                {updatePendingInstall ? "Atualização obrigatória" : "Iniciar voo"}
+                {updatePendingInstall ? "Atualização obrigatória" : "Voar agora"}
               </button>
 
               <button onClick={handleFinishFlight} disabled={!canFinishFlight}>
