@@ -1168,6 +1168,7 @@ function App() {
   }
 
   const fuelPercent = getFuelPercent(simData);
+  const updatePendingInstall = updateState === "downloaded";
 
   return (
     <main className="app-shell">
@@ -1262,9 +1263,13 @@ function App() {
 
               <button
                 onClick={handleStartFlight}
-                disabled={!validationStatus.ok || activeMission.client_status === "in_flight"}
+                disabled={
+                  updatePendingInstall ||
+                  !validationStatus.ok ||
+                  activeMission.client_status === "in_flight"
+                }
               >
-                Iniciar voo
+                {updatePendingInstall ? "Atualização obrigatória" : "Iniciar voo"}
               </button>
 
               <button onClick={handleFinishFlight} disabled={!canFinishFlight}>
