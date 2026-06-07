@@ -3,7 +3,25 @@ import sys
 import time
 import json
 import threading
+import math
 
+
+def normalize_heading(value):
+    try:
+        heading = float(value or 0)
+
+        # Se vier em radianos, converte para graus
+        if abs(heading) <= 6.28319:
+            heading = math.degrees(heading)
+
+        heading = heading % 360
+
+        if heading < 0:
+            heading += 360
+
+        return heading
+    except Exception:
+        return 0
 
 def prepare_simconnect_dll_path():
     possible_paths = []
@@ -250,7 +268,7 @@ def main():
                 longitude = read_var("PLANE_LONGITUDE")
                 altitude_ft = read_var("PLANE_ALTITUDE")
                 ground_speed = read_var("GROUND_VELOCITY")
-                heading = read_var("PLANE_HEADING_DEGREES_TRUE")
+                heading = normalize_heading(read_var("PLANE_HEADING_DEGREES_TRUE"))
 
                 g_force = read_var("G_FORCE")
                 bank_degrees = read_var("PLANE_BANK_DEGREES")
@@ -286,7 +304,7 @@ def main():
                     "engine_running": bool(engine_running),
                 })
 
-                time.sleep(2)
+                time.sleep(1)
 
         except Exception as e:
             send({
