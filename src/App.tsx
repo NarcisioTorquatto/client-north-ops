@@ -291,9 +291,14 @@ function calculatePilotEvaluation({
 }
 
 function normalizeHeading(value: any) {
-  const heading = Number(value || 0);
+  let heading = Number(value || 0);
 
   if (!Number.isFinite(heading)) return 0;
+
+  // Se vier em radianos, converte para graus
+  if (Math.abs(heading) <= Math.PI * 2) {
+    heading = heading * (180 / Math.PI);
+  }
 
   const normalized = heading % 360;
 

@@ -268,7 +268,11 @@ def main():
                 longitude = read_var("PLANE_LONGITUDE")
                 altitude_ft = read_var("PLANE_ALTITUDE")
                 ground_speed = read_var("GROUND_VELOCITY")
-                heading = normalize_heading(read_var("PLANE_HEADING_DEGREES_TRUE"))
+                heading = normalize_heading(
+                    read_var("PLANE_HEADING_DEGREES_MAGNETIC")
+                    or read_var("PLANE_HEADING_DEGREES_TRUE")
+                )                
+                
 
                 g_force = read_var("G_FORCE")
                 bank_degrees = read_var("PLANE_BANK_DEGREES")
