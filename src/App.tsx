@@ -290,6 +290,17 @@ function calculatePilotEvaluation({
   };
 }
 
+function normalizeHeading(value: any) {
+  const heading = Number(value || 0);
+
+  if (!Number.isFinite(heading)) return 0;
+
+  const normalized = heading % 360;
+
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
   const [password, setPassword] = useState(() => localStorage.getItem("northops_password") || "");
@@ -640,7 +651,7 @@ function App() {
         longitude: Number(currentSimData.longitude),
         altitude_ft: Number(currentSimData.altitude_ft),
         ground_speed: Number(currentSimData.ground_speed),
-        heading: Number(currentSimData.heading),
+        heading: normalizeHeading(currentSimData.heading),        
         fuel_percent: Number(getFuelPercent(currentSimData)),
         aircraft: currentSimData.aircraft,
         sim_on_ground: Boolean(currentSimData.on_ground),
@@ -721,7 +732,7 @@ function App() {
         setCanFinishFlight(false);
         setMessage(`Pouso fora do destino: ${distanceFromDestination.toFixed(1)} NM.`);
       }
-    }, 5000);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [telemetryStarted, activeMission, user, destinationAirport]);
