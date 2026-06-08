@@ -13,6 +13,19 @@ const MAX_SAFE_DESCENT_RATE = -1500;
 const HARD_LANDING_DESCENT_RATE = -700;
 const HIGH_LANDING_SPEED = 95;
 
+const careerLevels = [
+  { level: 1, title: "Aluno Piloto I", minXp: 0, minHours: 0 },
+  { level: 2, title: "Aluno Piloto II", minXp: 100, minHours: 2 },
+  { level: 3, title: "Aluno Piloto III", minXp: 300, minHours: 5 },
+  { level: 4, title: "Piloto Privado", minXp: 700, minHours: 10 },
+  { level: 5, title: "Piloto Regional", minXp: 1500, minHours: 20 },
+  { level: 6, title: "Piloto Comercial", minXp: 4000, minHours: 50 },
+  { level: 7, title: "Piloto Sênior", minXp: 9000, minHours: 100 },
+  { level: 8, title: "Comandante Regional", minXp: 18000, minHours: 250 },
+  { level: 9, title: "Comandante Comercial", minXp: 35000, minHours: 500 },
+  { level: 10, title: "Comandante Executivo", minXp: 70000, minHours: 1000 },
+];
+
 type UpdateState =
   | "idle"
   | "checking"
@@ -21,6 +34,18 @@ type UpdateState =
   | "downloaded"
   | "none"
   | "error";
+
+function getCareerLevelFromXpAndHours(xp: number, totalHours: number) {
+  return (
+    [...careerLevels]
+      .reverse()
+      .find(
+        (item) =>
+          Number(xp || 0) >= item.minXp &&
+          Number(totalHours || 0) >= item.minHours
+      ) || careerLevels[0]
+  );
+}
 
 function calculateDistanceNM(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 3440.065;
@@ -46,18 +71,8 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
   const sim = normalizeAircraftName(simAircraft);
 
   const aircraftGroups = [
-    [
-      "cessna172skyhawk",
-      "cessna172",
-      "c172",
-      "c172sp",
-      "skyhawk",
-    ],
-    [
-      "kodiak100",
-      "kodiak",
-      "questkodiak",
-    ],
+    ["cessna172skyhawk", "cessna172", "c172", "c172sp", "skyhawk"],
+    ["kodiak100", "kodiak", "questkodiak"],
     [
       "cessna208bgrandcaravan",
       "cessna208",
@@ -79,29 +94,15 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "blacksquarebaron",
       "blacksquarebaron58tc",
     ],
-    [
-      "beechcraftbonanzag36",
-      "beechcraftbonanza",
-      "bonanzag36",
-      "g36",
-      "bonanza",
-    ],
-    [
-      "embraere110bandeirante",
-      "embraere110",
-      "e110",
-      "bandeirante",
-      "embraerbandeirante",
-    ],
+    ["beechcraftbonanzag36", "beechcraftbonanza", "bonanzag36", "g36", "bonanza"],
+    ["embraere110bandeirante", "embraere110", "e110", "bandeirante", "embraerbandeirante"],
   ];
 
   const matchedGroup = aircraftGroups.find((group) =>
     group.some((alias) => mission.includes(alias) || alias.includes(mission))
   );
 
-  if (!matchedGroup) {
-    return sim.includes(mission) || mission.includes(sim);
-  }
+  if (!matchedGroup) return sim.includes(mission) || mission.includes(sim);
 
   return matchedGroup.some((alias) => sim.includes(alias));
 }
@@ -123,27 +124,14 @@ function getFuelPercent(simData: any) {
   return 0;
 }
 
-function getXpRequiredForLevel(level: number) {
-  return Math.floor(level * level * 350);
-}
-
-
-function getLevelFromXp(xp: number) {
-  let level = 1;
-
-  while (xp >= getXpRequiredForLevel(level + 1)) {
-    level++;
-  }
-
-  return level;
-}
-
 function calculateFlightXp(mission: any) {
   const distance = Number(mission.distance_nm || 0);
+  const payloadKg = Number(mission.payload_total_kg || mission.weight_kg || 0);
 
   let xp = Math.round(distance * 0.8);
 
   xp += 40;
+  xp += Math.round(payloadKg / 40);
 
   if (mission.is_remote) xp += 35;
 
@@ -156,10 +144,13 @@ function calculateFlightXp(mission: any) {
 function getPaymentBonus(level: number, isPremium: boolean) {
   let bonus = 0;
 
-  if (level >= 36) bonus += 0.2;
-  else if (level >= 21) bonus += 0.15;
-  else if (level >= 11) bonus += 0.1;
-  else if (level >= 6) bonus += 0.05;
+  if (level >= 10) bonus += 0.16;
+  else if (level >= 9) bonus += 0.14;
+  else if (level >= 8) bonus += 0.12;
+  else if (level >= 7) bonus += 0.1;
+  else if (level >= 6) bonus += 0.08;
+  else if (level >= 5) bonus += 0.05;
+  else if (level >= 4) bonus += 0.03;
 
   if (isPremium) bonus += 0.1;
 
@@ -168,7 +159,6 @@ function getPaymentBonus(level: number, isPremium: boolean) {
 
 function addFlightEvent(eventsRef: MutableRefObject<any[]>, event: any) {
   const alreadyExists = eventsRef.current.some((item) => item.code === event.code);
-
   if (alreadyExists) return;
 
   eventsRef.current.push({
@@ -227,10 +217,7 @@ function calculatePilotEvaluation({
     0
   );
 
-  const pilotRating = Math.max(
-    0,
-    Math.min(10, Number((10 - totalPenalty).toFixed(1)))
-  );
+  const pilotRating = Math.max(0, Math.min(10, Number((10 - totalPenalty).toFixed(1))));
 
   const hasPassengers = Number(mission.passengers || 0) > 0;
   const hasCargo = Number(mission.cargo_weight_kg || 0) > 0;
@@ -295,7 +282,6 @@ function normalizeHeading(value: any) {
 
   if (!Number.isFinite(heading)) return 0;
 
-  // Se vier em radianos, converte para graus
   if (Math.abs(heading) <= Math.PI * 2) {
     heading = heading * (180 / Math.PI);
   }
@@ -304,7 +290,6 @@ function normalizeHeading(value: any) {
 
   return normalized < 0 ? normalized + 360 : normalized;
 }
-
 
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
@@ -397,13 +382,8 @@ function App() {
       setUpdateState(status);
       setUpdateStatus(data.message || "Pronto");
 
-      if (status === "downloading") {
-        setUpdatePercent(Number(data.percent || 0));
-      }
-
-      if (status === "downloaded") {
-        setUpdatePercent(100);
-      }
+      if (status === "downloading") setUpdatePercent(Number(data.percent || 0));
+      if (status === "downloaded") setUpdatePercent(100);
     });
   }, []);
 
@@ -472,6 +452,7 @@ function App() {
       });
       return;
     }
+
     if (updateState === "downloaded") {
       setValidationStatus({
         ok: false,
@@ -513,7 +494,7 @@ function App() {
     setTelemetryStarted(false);
     setCanFinishFlight(false);
 
-    const alert = `${reason} • MULTA $${fine.toLocaleString("pt-BR")} • VOO CANCELADO`;
+    const alert = `${reason} • MULTA ${fine.toLocaleString("pt-BR")} NOC • VOO CANCELADO`;
 
     setCheatMessage(alert);
     setMessage(alert);
@@ -528,9 +509,7 @@ function App() {
 
     await supabaseClient
       .from("wallets")
-      .update({
-        balance: currentBalance - fine,
-      })
+      .update({ balance: currentBalance - fine })
       .eq("user_id", user.id);
 
     await supabaseClient
@@ -572,7 +551,6 @@ function App() {
 
       const bankAngle = rawBank <= Math.PI ? rawBank * (180 / Math.PI) : rawBank;
       const pitchAngle = rawPitch <= Math.PI ? rawPitch * (180 / Math.PI) : rawPitch;
-
 
       const verticalSpeed = Number(currentSimData.vertical_speed || 0);
       const airspeed = Number(currentSimData.airspeed_indicated || 0);
@@ -656,19 +634,17 @@ function App() {
         longitude: Number(currentSimData.longitude),
         altitude_ft: Number(currentSimData.altitude_ft),
         ground_speed: Number(currentSimData.ground_speed),
-        heading: normalizeHeading(currentSimData.heading),        
+        heading: normalizeHeading(currentSimData.heading),
         fuel_percent: Number(getFuelPercent(currentSimData)),
         aircraft: currentSimData.aircraft,
         sim_on_ground: Boolean(currentSimData.on_ground),
         engine_running: Boolean(currentSimData.engine_running),
-
         g_force: Number(gForce),
         bank_degrees: Number(bankAngle),
         pitch_degrees: Number(pitchAngle),
         vertical_speed: Number(verticalSpeed),
         airspeed_indicated: Number(airspeed),
       };
-
 
       const { error } = await supabaseClient.from("flight_telemetry").insert(payload);
 
@@ -829,11 +805,8 @@ function App() {
 
     setUser(data.user);
     await loadActiveMission(data.user.id);
-    setLoading(false); 
- 
- 
+    setLoading(false);
   }
-  
 
   async function handleStartFlight() {
     if (!activeMission) return;
@@ -857,8 +830,6 @@ function App() {
         cargo_weight_kg: Number(activeMission.cargo_weight_kg || 0),
         takeoff_weight_kg: Number(activeMission.takeoff_weight_kg || 0),
       });
-
-      console.log("BRIEFING APLICADO:", briefingResult);
 
       const fuelReadback = Number(
         briefingResult?.result?.fuel?.readback?.fuel_total_quantity || 0
@@ -933,10 +904,14 @@ function App() {
     completingFlightRef.current = true;
 
     const completedAt = new Date().toISOString();
-    const startedAt = activeMission.started_at || activeMission.telemetry_started_at || completedAt;
+    const startedAt =
+      activeMission.started_at || activeMission.telemetry_started_at || completedAt;
 
     const flightHours =
-      (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000 / 60 / 60;
+      (new Date(completedAt).getTime() - new Date(startedAt).getTime()) /
+      1000 /
+      60 /
+      60;
 
     const { data: profileData } = await supabaseClient
       .from("profiles")
@@ -944,9 +919,23 @@ function App() {
       .eq("id", user.id)
       .single();
 
+    const { data: previousLogs } = await supabaseClient
+      .from("flight_logs")
+      .select("flight_hours")
+      .eq("user_id", user.id);
+
+    const previousTotalHours = (previousLogs || []).reduce(
+      (sum, log) => sum + Number(log.flight_hours || 0),
+      0
+    );
+
+    const totalHoursAfterFlight = previousTotalHours + Number(flightHours.toFixed(2));
+
     const currentXp = Number(profileData?.xp || 0);
-    const currentLevel = Number(profileData?.level || 1);
     const isPremium = Boolean(profileData?.is_premium || false);
+    const currentReputation = Number(profileData?.reputation || 100);
+
+    const currentCareer = getCareerLevelFromXpAndHours(currentXp, previousTotalHours);
 
     const baseXp = calculateFlightXp(activeMission);
 
@@ -968,16 +957,17 @@ function App() {
 
     const earnedXp = evaluation.xpFinal;
     const newXp = currentXp + earnedXp;
-    const newLevel = getLevelFromXp(newXp);
 
-    const currentReputation = Number(profileData?.reputation || 100);
+    const newCareer = getCareerLevelFromXpAndHours(newXp, totalHoursAfterFlight);
+    const newLevel = newCareer.level;
+
     const newReputation = Math.max(
       0,
       Math.min(100, currentReputation + evaluation.reputationChange)
     );
 
     const basePayment = Number(activeMission.payment || 0);
-    const paymentBonus = getPaymentBonus(currentLevel, isPremium);
+    const paymentBonus = getPaymentBonus(currentCareer.level, isPremium);
     const finalPayment = Math.round(basePayment + basePayment * paymentBonus);
 
     const { error: logError } = await supabaseClient.from("flight_logs").insert({
@@ -1050,8 +1040,7 @@ function App() {
           fuel: safeRemainingFuel,
           current_airport: activeMission.destination,
           total_hours:
-            Number(activeFleet.total_hours || 0) +
-            Number(flightHours.toFixed(2)),
+            Number(activeFleet.total_hours || 0) + Number(flightHours.toFixed(2)),
           total_flights: Number(activeFleet.total_flights || 0) + 1,
           total_revenue: Number(activeFleet.total_revenue || 0) + finalPayment,
         })
@@ -1092,10 +1081,8 @@ function App() {
     const newAverage =
       currentFlights === 0
         ? evaluation.pilotRating
-        : (
-            (currentAverage * currentFlights + evaluation.pilotRating) /
-            (currentFlights + 1)
-          );
+        : (currentAverage * currentFlights + evaluation.pilotRating) /
+          (currentFlights + 1);
 
     await supabaseClient
       .from("profiles")
@@ -1108,7 +1095,6 @@ function App() {
       })
       .eq("id", user.id);
 
-      
     setLastEvaluation({
       ...evaluation,
       payment: finalPayment,
@@ -1141,12 +1127,17 @@ function App() {
 
     await loadActiveMission(user.id);
 
-    const levelText = newLevel > currentLevel ? ` Subiu para o nível ${newLevel}!` : "";
+    const levelText =
+      newLevel > currentCareer.level
+        ? ` Subiu para ${newCareer.title} — nível ${newLevel}!`
+        : "";
 
     setMessage(
       `Voo finalizado. Nota: ${evaluation.pilotRating}/10. XP: +${earnedXp}. Reputação: ${
         evaluation.reputationChange >= 0 ? "+" : ""
-      }${evaluation.reputationChange}. Pagamento: ${finalPayment.toLocaleString("pt-BR")} NOC.${levelText}`
+      }${evaluation.reputationChange}. Pagamento: ${finalPayment.toLocaleString(
+        "pt-BR"
+      )} NOC.${levelText}`
     );
   }
 
@@ -1165,8 +1156,15 @@ function App() {
       })
       .eq("id", activeMission.id);
 
-    await supabaseClient.from("flight_telemetry").delete().eq("active_mission_id", activeMission.id);
-    await supabaseClient.from("flight_logs").delete().eq("mission_id", activeMission.id);
+    await supabaseClient
+      .from("flight_telemetry")
+      .delete()
+      .eq("active_mission_id", activeMission.id);
+
+    await supabaseClient
+      .from("flight_logs")
+      .delete()
+      .eq("mission_id", activeMission.id);
 
     setTelemetryStarted(false);
     setCanFinishFlight(false);
@@ -1214,8 +1212,14 @@ function App() {
 
         <div className="header-status">
           <StatusDot online={!!user} label={user ? "Piloto conectado" : "Offline"} />
-          <StatusDot online={!!simData?.connected} label={simData?.connected ? "MSFS online" : "MSFS offline"} />
-          <StatusDot online={!!simData?.on_ground} label={simData?.on_ground ? "Em solo" : "Em voo"} />
+          <StatusDot
+            online={!!simData?.connected}
+            label={simData?.connected ? "MSFS online" : "MSFS offline"}
+          />
+          <StatusDot
+            online={!!simData?.on_ground}
+            label={simData?.on_ground ? "Em solo" : "Em voo"}
+          />
         </div>
 
         <div className="update-box">
@@ -1229,7 +1233,9 @@ function App() {
             {updateState === "available" && "Atualizar agora"}
             {updateState === "downloading" && `Baixando ${updatePercent}%`}
             {updateState === "downloaded" && "Reiniciar e instalar"}
-            {(updateState === "idle" || updateState === "none" || updateState === "error") &&
+            {(updateState === "idle" ||
+              updateState === "none" ||
+              updateState === "error") &&
               "Verificar atualização"}
           </button>
 
@@ -1413,7 +1419,11 @@ function App() {
 
                 {lastEvaluation.flightEvents?.map((event: any) => (
                   <p key={event.code}>
-                    {event.type === "positive" ? "✅" : event.type === "danger" ? "🔴" : "⚠️"}{" "}
+                    {event.type === "positive"
+                      ? "✅"
+                      : event.type === "danger"
+                      ? "🔴"
+                      : "⚠️"}{" "}
                     {event.title}
                   </p>
                 ))}
