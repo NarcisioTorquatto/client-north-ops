@@ -379,9 +379,6 @@ function App() {
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updatePercent, setUpdatePercent] = useState(0);
 
-  const [maxGDisplay, setMaxGDisplay] = useState(1);
-  const [maxBankDisplay, setMaxBankDisplay] = useState(0);
-
   const simDataRef = useRef<any>(null);
   const landingStartedAtRef = useRef<number | null>(null);
   const completingFlightRef = useRef(false);
@@ -626,9 +623,6 @@ function App() {
       maxGForceRef.current = Math.max(maxGForceRef.current, displayGForce);
       maxBankAngleRef.current = Math.max(maxBankAngleRef.current, bankAngle);
       maxPitchAngleRef.current = Math.max(maxPitchAngleRef.current, pitchAngle);
-
-      setMaxGDisplay(maxGForceRef.current);
-      setMaxBankDisplay(maxBankAngleRef.current);
 
       if (verticalSpeed < maxDescentRateRef.current) {
         maxDescentRateRef.current = verticalSpeed;
@@ -925,8 +919,6 @@ function App() {
       maxDescentRateRef.current = 0;
       landingSpeedRef.current = 0;
 
-      setMaxGDisplay(1);
-      setMaxBankDisplay(0);
       setCheatMessage("");
       setLastEvaluation(null);
     } catch (error: any) {
