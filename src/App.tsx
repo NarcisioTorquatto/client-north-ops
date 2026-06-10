@@ -277,6 +277,68 @@ function calculatePilotEvaluation({
   };
 }
 
+
+function getBarColor(value: number) {
+  if (value >= 76) return "#22c55e";
+  if (value >= 56) return "#facc15";
+  if (value >= 36) return "#fb923c";
+  return "#ef4444";
+}
+
+function calculateLiveOperationalScores({
+  mission,
+  events,
+}: {
+  mission: any;
+  events: any[];
+}) {
+  const totalPenalty = (events || []).reduce(
+    (sum, event) => sum + Number(event.penalty || 0),
+    0
+  );
+
+  const hasPassengers = Number(mission?.passengers || 0) > 0;
+  const hasCargo = Number(mission?.cargo_weight_kg || 0) > 0;
+
+  const passengerSatisfaction = hasPassengers
+    ? Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 8)))
+    : 100;
+
+  const cargoIntegrity = hasCargo
+    ? Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 7)))
+    : 100;
+
+  return {
+    passengerSatisfaction,
+    cargoIntegrity,
+  };
+}
+
+function calculateAircraftWearAfterFlight({
+  currentCondition,
+  flightHours,
+  events,
+}: {
+  currentCondition: number;
+  flightHours: number;
+  events: any[];
+}) {
+  const baseWear = flightHours * 1.15;
+
+  const eventPenalty = (events || []).reduce(
+    (sum: number, event: any) => sum + Number(event.penalty || 0) * 0.15,
+    0
+  );
+
+  const totalWear = Number((baseWear + eventPenalty).toFixed(2));
+  const newCondition = Math.max(0, Number(currentCondition || 100) - totalWear);
+
+  return {
+    totalWear,
+    newCondition: Number(newCondition.toFixed(2)),
+  };
+}
+
 function normalizeHeading(value: any) {
   let heading = Number(value || 0);
 
@@ -310,6 +372,7 @@ function App() {
   const [canFinishFlight, setCanFinishFlight] = useState(false);
   const [cheatMessage, setCheatMessage] = useState("");
   const [lastEvaluation, setLastEvaluation] = useState<any>(null);
+  const [aircraftCondition, setAircraftCondition] = useState(100);
 
   const [appVersion, setAppVersion] = useState("...");
   const [updateStatus, setUpdateStatus] = useState("Pronto");
@@ -356,6 +419,11 @@ function App() {
           Math.max(0, ((totalDistance - distanceToDestination) / totalDistance) * 100)
         )
       : 0;
+
+  const liveScores = calculateLiveOperationalScores({
+    mission: activeMission,
+    events: flightEventsRef.current,
+  });
 
   useEffect(() => {
     window.northOps?.onSimData((data: any) => {
@@ -760,6 +828,15 @@ function App() {
       setDestinationAirport(destinationData);
     }
 
+    const { data: activeFleetData } = await supabaseClient
+      .from("pilot_fleet")
+      .select("condition")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    setAircraftCondition(Number(activeFleetData?.condition || 100));
+
     if (data.client_status === "in_flight") {
       setTelemetryStarted(true);
     }
@@ -1028,21 +1105,49 @@ function App() {
 
     const { data: activeFleet } = await supabaseClient
       .from("pilot_fleet")
-      .select("id, fuel, total_hours, total_flights, total_revenue")
+      .select(
+        "id, fuel, total_hours, total_flights, total_revenue, condition, hours_since_maintenance"
+      )
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle();
 
     if (activeFleet) {
+      const completedFlightHours = Number(flightHours.toFixed(2));
+
+      const newTotalHours =
+        Number(activeFleet.total_hours || 0) + completedFlightHours;
+
+      const newHoursSinceMaintenance =
+        Number(activeFleet.hours_since_maintenance || 0) + completedFlightHours;
+
+      const wear = calculateAircraftWearAfterFlight({
+        currentCondition: Number(activeFleet.condition || 100),
+        flightHours: completedFlightHours,
+        events: evaluation.flightEvents,
+      });
+
+      const newMaintenanceStatus =
+        wear.newCondition <= 35 || newHoursSinceMaintenance >= 50
+          ? "maintenance_required"
+          : wear.newCondition <= 75 || newHoursSinceMaintenance >= 25
+          ? "maintenance_recommended"
+          : "available";
+
+      const shouldBlockAircraft = newMaintenanceStatus === "maintenance_required";
+
       const { error: fleetError } = await supabaseClient
         .from("pilot_fleet")
         .update({
           fuel: safeRemainingFuel,
           current_airport: activeMission.destination,
-          total_hours:
-            Number(activeFleet.total_hours || 0) + Number(flightHours.toFixed(2)),
+          total_hours: newTotalHours,
           total_flights: Number(activeFleet.total_flights || 0) + 1,
           total_revenue: Number(activeFleet.total_revenue || 0) + finalPayment,
+          condition: wear.newCondition,
+          hours_since_maintenance: Number(newHoursSinceMaintenance.toFixed(2)),
+          maintenance_status: newMaintenanceStatus,
+          is_active: shouldBlockAircraft ? false : true,
         })
         .eq("id", activeFleet.id);
 
@@ -1348,24 +1453,49 @@ function App() {
             </div>
           </div>
 
-          <div className="telemetry-strip">
-            <Metric label="Aeronave" value={simData?.aircraft || activeMission.aircraft || "-"} />
-            <FuelMetric fuel={fuelPercent} />
-            <Metric label="Velocidade" value={`${Math.round(simData?.ground_speed || 0)} kt`} />
-            <Metric label="Motor" value={simData?.engine_running ? "Ligado" : "Desligado"} />
-            <Metric label="Peso Pax" value={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`} />
-            <Metric label="Peso Carga" value={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`} />
-            <Metric
-              label="Fuel Planejado"
-              value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
+          <div className="telemetry-strip compact">
+            <div className="aircraft-summary-card">
+              <span>✈️ Aeronave</span>
+              <strong>{simData?.aircraft || activeMission.aircraft || "-"}</strong>
+              <small>Atualizada pela telemetria do simulador</small>
+            </div>
+
+            <ProgressMetric
+              icon="🛩️"
+              label="Condição da aeronave"
+              value={aircraftCondition}
             />
-            <Metric label="Peso Decolagem" value={`${Math.round(activeMission.takeoff_weight_kg || 0)} kg`} />
-            <Metric label="G Máx." value={`${Number(maxGDisplay || 1).toFixed(1)}G`} />
-            <Metric label="Inclinação Máx." value={`${Math.round(maxBankDisplay || 0)}°`} />
+
+            <FuelMetric fuel={fuelPercent} />
+
+            <ProgressMetric
+              icon="📦"
+              label="Integridade da carga"
+              value={liveScores.cargoIntegrity}
+              detail={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`}
+            />
+
+            <ProgressMetric
+              icon="🧍"
+              label="Satisfação pax"
+              value={liveScores.passengerSatisfaction}
+              detail={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`}
+            />
+
             <Metric
-              label="Pagamento"
+              label="💰 Pagamento"
               value={`${activeMission.payment?.toLocaleString("pt-BR")} NOC`}
               className="payment-card"
+            />
+
+            <Metric
+              label="📍 Velocidade"
+              value={`${Math.round(simData?.ground_speed || 0)} kt`}
+            />
+
+            <Metric
+              label="⛽ Planejado"
+              value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
             />
           </div>
         </section>
@@ -1464,8 +1594,44 @@ function Metric({
   );
 }
 
+
+function ProgressMetric({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+  detail?: string;
+}) {
+  const safeValue = Math.min(100, Math.max(0, Number(value || 0)));
+
+  return (
+    <div className="metric progress-metric">
+      <div className="metric-header-line">
+        <span>{icon} {label}</span>
+        {detail && <em>{detail}</em>}
+      </div>
+
+      <strong>{safeValue.toFixed(0)}%</strong>
+
+      <div className="fuel-bar">
+        <div
+          className="fuel-fill"
+          style={{
+            width: `${safeValue}%`,
+            background: getBarColor(safeValue),
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function FuelMetric({ fuel }: { fuel: number }) {
-  const color = fuel > 60 ? "#22c55e" : fuel > 30 ? "#facc15" : "#ef4444";
+  const color = getBarColor(fuel);
 
   return (
     <div className="metric fuel-metric">

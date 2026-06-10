@@ -1,6 +1,6 @@
 {
   "name": "north-ops-client",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "private": true,
   "author": "North Ops Cliente",
   "main": "electron/main.cjs",
