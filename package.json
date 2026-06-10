@@ -1,24 +1,28 @@
 {
   "name": "north-ops-client",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "private": true,
   "author": "North Ops Cliente",
+  "description": "Cliente oficial do North Ops",
   "main": "electron/main.cjs",
   "type": "module",
+
   "scripts": {
     "dev": "vite",
     "electron": "electron electron/main.cjs",
     "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron electron/main.cjs\"",
     "build": "tsc -b && vite build",
     "dist": "npm run build && electron-builder",
-    "publish": "npm run build && electron-builder --publish always"
+    "publish": "cross-env DEBUG=electron-builder NODE_OPTIONS=--dns-result-order=ipv4first npm run build && electron-builder --publish always"
   },
+
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
     "electron-updater": "^6.8.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
+
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
@@ -40,53 +44,49 @@
     "wait-on": "^9.0.10"
   },
 
+  "build": {
+    "appId": "com.northops.client",
+    "productName": "NORTH OPS Client",
 
-"build": {
-  "appId": "com.northops.client",
-  "productName": "NORTH OPS Client",
+    "directories": {
+      "output": "release"
+    },
 
-  "directories": {
-    "output": "release"
-  },
+    "icon": "resources/icon.ico",
 
-  "icon": "resources/icon.ico",
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
 
-  "win": {
-    "target": "nsis",
-    "icon": "resources/icon.ico"
-  },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
 
-  "files": [
-    "dist/**/*",
-    "electron/**/*",
-    "package.json"
-  ],
+    "extraResources": [
+      {
+        "from": "resources/bridge",
+        "to": "bridge"
+      }
+    ],
 
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NORTH OPS Client"
+    },
 
-"extraResources": [
-  {
-    "from": "resources/bridge",
-    "to": "bridge"
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "NarcisioTorquatto",
+        "repo": "client-north-ops",
+        "releaseType": "release"
+      }
+    ]
   }
-    
-  ],
-  
-  "nsis": {
-    "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "NORTH OPS Client"
-  },
-  "publish": [
-    {
-      "provider": "github",
-      "owner": "NarcisioTorquatto",
-      "repo": "client-north-ops",
-      "releaseType": "release"
-    }
-  ]  
-}
-
-
 }
