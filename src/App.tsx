@@ -1219,9 +1219,6 @@ function App() {
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
 
-    setMaxGDisplay(1);
-    setMaxBankDisplay(0);
-
     await loadActiveMission(user.id);
 
     const levelText =
@@ -1279,9 +1276,6 @@ function App() {
     maxPitchAngleRef.current = 0;
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
-
-    setMaxGDisplay(1);
-    setMaxBankDisplay(0);
 
     setActiveMission({
       ...activeMission,
