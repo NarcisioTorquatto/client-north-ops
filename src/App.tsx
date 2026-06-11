@@ -1136,7 +1136,7 @@ function App() {
           total_hours: newTotalHours,
           total_flights: Number(activeFleet.total_flights || 0) + 1,
           total_revenue: Number(activeFleet.total_revenue || 0) + finalPayment,
-          condition: wear.newCondition,
+          condition: Math.round(wear.newCondition),
           hours_since_maintenance: Number(newHoursSinceMaintenance.toFixed(2)),
           maintenance_status: newMaintenanceStatus,
           is_active: shouldBlockAircraft ? false : true,
