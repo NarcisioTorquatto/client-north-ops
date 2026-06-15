@@ -279,6 +279,7 @@ def main():
                 pitch_degrees = read_var("PLANE_PITCH_DEGREES")
                 vertical_speed = read_var("VERTICAL_SPEED")
                 airspeed_indicated = read_var("AIRSPEED_INDICATED")
+                crash_flag = read_var("CRASH_FLAG")
 
                 fuel_percent = read_var("FUEL_TOTAL_QUANTITY_PERCENT")
                 fuel_total_quantity = read_var("FUEL_TOTAL_QUANTITY")
@@ -300,6 +301,7 @@ def main():
                     "pitch_degrees": pitch_degrees,
                     "vertical_speed": vertical_speed,
                     "airspeed_indicated": airspeed_indicated,
+                    "crash_flag": crash_flag,
                     "fuel_percent": fuel_percent,
                     "fuel_total_quantity": fuel_total_quantity,
                     "fuel_total_capacity": fuel_total_capacity,

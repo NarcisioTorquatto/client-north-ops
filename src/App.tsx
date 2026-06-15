@@ -4,6 +4,9 @@ import "./App.css";
 
 const FUEL_CHEAT_FINE = 15000;
 const SIM_RATE_CHEAT_FINE = 25000;
+const CRASH_FINE = 3000;
+const CRASH_REPUTATION_PENALTY = 15;
+
 const FUEL_TOLERANCE_GAL = 3;
 
 const MAX_SAFE_G_FORCE = 1.7;
@@ -224,6 +227,43 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "asoboskycourier",
       "asoboc408",
     ],
+  // Cessna 182 RG II
+  [
+    "cessna182rgii",
+    "cessna182rg",
+    "cessna182",
+    "c182rgii",
+    "c182rg",
+    "c182",
+    "skylane",
+    "skylanerg",
+    "cessnaskylane",
+    "carenadoc182rg",
+    "carenadocessna182",
+    "carenadoc182",
+    "a2ac182",
+    "a2acessna182"
+  ],
+
+  // Daher TBM 960
+  [
+    "dahertbm960",
+    "tbm960",
+    "dahertbm",
+    "tbm",
+    "socatatbm960",
+    "socatatbm",
+    "tbm930",
+    "asobotbm930",
+    "asobotbm",
+    "black-squaretbm",
+    "blacksquaretbm",
+    "bksqtbm",
+    "bksqtbm960",
+    "microsofttbm",
+    "msfstbm"
+  ],
+
   ];
 
   const matchedGroup = aircraftGroups.find((group) =>
@@ -657,6 +697,10 @@ function App() {
     setValidationStatus({ ok: true, message: "Tudo OK. Pronto para iniciar." });
   }, [activeMission, simData, originAirport, updateState]);
 
+
+
+
+  
   async function handleUpdateButton() {
     try {
       if (updateState === "available") {
@@ -681,6 +725,8 @@ function App() {
   }
 
   async function applyFineAndCancelFlight(reason: string, fine: number, clientStatus: string) {
+
+    
     if (!activeMission || !user || cheatDetectedRef.current) return;
 
     cheatDetectedRef.current = true;
@@ -729,6 +775,7 @@ function App() {
     if (activeMission.client_status !== "in_flight") return;
 
     const interval = setInterval(async () => {
+      
       const currentSimData = simDataRef.current;
       if (!currentSimData?.connected) return;
 
@@ -747,6 +794,19 @@ function App() {
 
       const verticalSpeed = Number(currentSimData.vertical_speed || 0);
       const airspeed = Number(currentSimData.airspeed_indicated || 0);
+      const crashFlag = Number(currentSimData.crash_flag || 0);
+      if (crashFlag === 1) {
+        await applyCrashPenalty();
+        return;
+      }
+      const crashed =
+        Number(currentSimData.sim_on_ground || currentSimData.on_ground) === 1 &&
+        verticalSpeed < -2500;
+
+      if (crashed) {
+        await applyCrashPenalty();
+        return;
+      }      
 
       maxGForceRef.current = Math.max(maxGForceRef.current, displayGForce);
       maxBankAngleRef.current = Math.max(maxBankAngleRef.current, bankAngle);
@@ -965,7 +1025,108 @@ function App() {
 
     setMessage("Missão ativa carregada.");
   }
+  async function applyCrashPenalty() {
+    if (!activeMission || !user || cheatDetectedRef.current) return;
 
+    cheatDetectedRef.current = true;
+
+    setTelemetryStarted(false);
+    setCanFinishFlight(false);
+
+    const alert =
+      `ACIDENTE DETECTADO • MULTA ${CRASH_FINE.toLocaleString(
+        "pt-BR"
+      )} NOC • REPUTAÇÃO -${CRASH_REPUTATION_PENALTY} • MISSÃO CANCELADA`;
+
+    setMessage(alert);
+    setCheatMessage(alert);
+
+    const { data: wallet } = await supabaseClient
+      .from("wallets")
+      .select("balance")
+      .eq("user_id", user.id)
+      .single();
+
+    const currentBalance = Number(wallet?.balance || 0);
+
+    await supabaseClient
+      .from("wallets")
+      .update({
+        balance: Math.max(0, currentBalance - CRASH_FINE),
+      })
+      .eq("user_id", user.id);
+
+    const { data: profile } = await supabaseClient
+      .from("profiles")
+      .select("reputation")
+      .eq("id", user.id)
+      .single();
+
+    await supabaseClient
+      .from("profiles")
+      .update({
+        reputation: Math.max(
+          0,
+          Number(profile?.reputation || 100) - CRASH_REPUTATION_PENALTY
+        ),
+      })
+      .eq("id", user.id);
+
+      const { data: activeFleet } = await supabaseClient
+        .from("pilot_fleet")
+        .select(
+          "id, condition, fuel, total_hours, total_flights, total_revenue, hours_since_maintenance"
+        )
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (activeFleet) {
+        const currentCondition = Number(activeFleet.condition || 100);
+
+        const newCondition = Math.max(
+          0,
+          currentCondition - 25
+        );
+
+        await supabaseClient
+          .from("pilot_fleet")
+          .update({
+            condition: newCondition,
+            maintenance_status:
+              newCondition <= 35
+                ? "maintenance_required"
+                : newCondition <= 75
+                ? "maintenance_recommended"
+                : "available",
+          })
+          .eq("id", activeFleet.id);
+      }
+
+      await supabaseClient
+        .from("active_missions")
+        .update({
+          status: "failed",
+          client_status: "crashed",
+          validation_message: alert,
+          completed_at: new Date().toISOString(),
+          telemetry_finished_at: new Date().toISOString(),
+        })
+        .eq("id", activeMission.id);
+      
+
+    await supabaseClient
+      .from("active_missions")
+      .update({
+        status: "failed",
+        client_status: "crashed",
+        validation_message: alert,
+        completed_at: new Date().toISOString(),
+        telemetry_finished_at: new Date().toISOString(),
+      })
+      .eq("id", activeMission.id);
+  }
+  
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -1246,6 +1407,9 @@ function App() {
         flightHours: completedFlightHours,
         events: evaluation.flightEvents,
       });
+
+
+
 
       const newMaintenanceStatus =
         wear.newCondition <= 35 || newHoursSinceMaintenance >= 50
