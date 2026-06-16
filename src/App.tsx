@@ -795,18 +795,29 @@ function App() {
       const verticalSpeed = Number(currentSimData.vertical_speed || 0);
       const airspeed = Number(currentSimData.airspeed_indicated || 0);
       const crashFlag = Number(currentSimData.crash_flag || 0);
+      const altitude = Number(currentSimData.altitude_ft || 0);
+
       if (crashFlag === 1) {
         await applyCrashPenalty();
         return;
       }
-      const crashed =
-        Number(currentSimData.sim_on_ground || currentSimData.on_ground) === 1 &&
-        verticalSpeed < -2500;
 
-      if (crashed) {
+      const severeCrash =
+        altitude < 2000 &&
+        (
+          verticalSpeed < -5000 ||
+          gForce > 4.5
+        );
+
+      if (severeCrash) {
+        console.log(
+          `CRASH DETECTED | ALT ${altitude} | VS ${verticalSpeed} | G ${gForce}`
+        );
+
         await applyCrashPenalty();
         return;
       }      
+      
 
       maxGForceRef.current = Math.max(maxGForceRef.current, displayGForce);
       maxBankAngleRef.current = Math.max(maxBankAngleRef.current, bankAngle);
@@ -1026,6 +1037,7 @@ function App() {
     setMessage("Missão ativa carregada.");
   }
   async function applyCrashPenalty() {
+    
     if (!activeMission || !user || cheatDetectedRef.current) return;
 
     cheatDetectedRef.current = true;
