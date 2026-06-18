@@ -751,6 +751,16 @@ function App() {
       .update({ balance: currentBalance - fine })
       .eq("user_id", user.id);
 
+    await supabaseClient.from("financial_transactions").insert({
+      user_id: user.id,
+      type: "penalty",
+      category: "Multa",
+      description: reason,
+      amount: -fine,
+      reference_id: activeMission.id,
+      reference_table: "active_missions",
+    });
+
     await supabaseClient
       .from("active_missions")
       .update({
@@ -1067,6 +1077,16 @@ function App() {
         balance: Math.max(0, currentBalance - CRASH_FINE),
       })
       .eq("user_id", user.id);
+
+    await supabaseClient.from("financial_transactions").insert({
+      user_id: user.id,
+      type: "penalty",
+      category: "Multa",
+      description: "Acidente detectado durante o voo",
+      amount: -CRASH_FINE,
+      reference_id: activeMission.id,
+      reference_table: "active_missions",
+    });      
 
     const { data: profile } = await supabaseClient
       .from("profiles")
@@ -1395,6 +1415,16 @@ function App() {
       completingFlightRef.current = false;
       return;
     }
+    await supabaseClient.from("financial_transactions").insert({
+      user_id: user.id,
+      type: "mission_income",
+      category: "Receita",
+      description: `Pagamento da missão ${activeMission.origin} → ${activeMission.destination}`,
+      amount: finalPayment,
+      reference_id: activeMission.id,
+      reference_table: "active_missions",
+    });
+
 
     const { data: activeFleet } = await supabaseClient
       .from("pilot_fleet")
