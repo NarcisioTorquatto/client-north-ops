@@ -136,18 +136,34 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
     [
       "cessna210centurion",
       "cessnac210centurion",
+      "cessna210",
+      "cessnac210",
       "c210centurion",
       "c210",
       "centurion",
-      "cessna210",
-      "cessnac210",
+
+      "cessnact210",
+      "cessnact210n",
+      "ct210",
+      "ct210n",
+      "turbo210",
+      "turbo210n",
+      "turbocharged210",
+
+      "carenadoaircraftct210n",
+      "carenadoaircraftct210nwx",
+      "carenadoct210n",
+      "carenadoct210",
       "carenadoc210",
-      "carenado-aircraft-ct210n [WX]",
       "carenadocessna210",
+      "carenadocenturion",
+      "carenadoturbo210",
+      "carenadoturbo210n",
+
       "blacksquarec210",
       "blacksquarecessna210",
       "bksqc210",
-      "bksqcenturion",
+      "bksqcenturion"
     ],
 
     [
