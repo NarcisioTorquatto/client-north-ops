@@ -142,6 +142,7 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "cessna210",
       "cessnac210",
       "carenadoc210",
+      "carenado-aircraft-ct210n [WX]",
       "carenadocessna210",
       "blacksquarec210",
       "blacksquarecessna210",
