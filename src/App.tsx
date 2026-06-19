@@ -231,6 +231,45 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "transbrasil",
       "tbb",
     ],
+    // Cessna 182 / C182 / Skylane
+    [
+      "cessna182rgii",
+      "cessna182rg",
+      "cessna182",
+      "cessnac182",
+      "c182rgii",
+      "c182rg",
+      "c182",
+      "skylane",
+      "skylanerg",
+      "cessnaskylane",
+      "cessnac182skylane",
+
+      "asoboc182",
+      "asobocessna182",
+      "microsoftc182",
+      "microsoftcessna182",
+
+      "carenadoc182rg",
+      "carenadocessna182",
+      "carenadoc182",
+
+      "a2ac182",
+      "a2acessna182",
+
+      "justflightc182",
+      "justflightcessna182",
+      "jfc182",
+
+      "wbsimc182",
+      "wbsimcessna182",
+
+      "blackbirdc182",
+      "blackbirdsimulationsc182",
+      "milvizc182",
+      "milvizcessna182"
+    ],
+
     [
       "cessna408skycourier",
       "cessna408",
