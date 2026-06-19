@@ -209,15 +209,28 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
     ],
 
     [
+      "embraeremb110bandeirante",
+      "embraeremb110",
+      "emb110bandeirante",
+      "emb110",
       "embraere110bandeirante",
       "embraere110",
       "e110",
       "bandeirante",
       "embraerbandeirante",
-      "nextgene110",
-      "nextgenbandeirante",
-    ],
 
+      "nextgenemb110",
+      "nextgenemb110p",
+      "nextgenemb110bandeirante",
+      "nextgenemb110ptransbrasil",
+      "nextgenemb110ptbb",
+      "nextgene110",
+      "nextgene110p",
+      "nextgenbandeirante",
+
+      "transbrasil",
+      "tbb",
+    ],
     [
       "cessna408skycourier",
       "cessna408",
