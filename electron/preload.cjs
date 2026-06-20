@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld("northOps", {
     return ipcRenderer.invoke("install-update");
   },
 
+  setCompactMode: (compact) => {
+    return ipcRenderer.invoke("set-compact-mode", compact);
+  },
+
   onUpdateStatus: (callback) => {
     ipcRenderer.on("update-status", (_event, data) => callback(data));
   },

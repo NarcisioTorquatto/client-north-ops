@@ -616,6 +616,10 @@ function App() {
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updatePercent, setUpdatePercent] = useState(0);
 
+  const [compactMode, setCompactMode] = useState(
+    () => localStorage.getItem("northops_compact_mode") === "true"
+  );  
+
   const simDataRef = useRef<any>(null);
   const landingStartedAtRef = useRef<number | null>(null);
   const completingFlightRef = useRef(false);
@@ -770,28 +774,38 @@ function App() {
 
 
   
-  async function handleUpdateButton() {
-    try {
-      if (updateState === "available") {
-        setUpdateState("downloading");
-        setUpdateStatus("Baixando atualização...");
-        await window.northOps.downloadUpdate();
-        return;
-      }
-
-      if (updateState === "downloaded") {
-        await window.northOps.installUpdate();
-        return;
-      }
-
-      setUpdateState("checking");
-      setUpdateStatus("Verificando atualizações...");
-      await window.northOps.checkForUpdates();
-    } catch {
-      setUpdateState("error");
-      setUpdateStatus("Não foi possível verificar atualizações.");
+async function handleUpdateButton() {
+  try {
+    if (updateState === "available") {
+      setUpdateState("downloading");
+      setUpdateStatus("Baixando atualização...");
+      await window.northOps.downloadUpdate();
+      return;
     }
+
+    if (updateState === "downloaded") {
+      await window.northOps.installUpdate();
+      return;
+    }
+
+    setUpdateState("checking");
+    setUpdateStatus("Verificando atualizações...");
+
+    const result = await window.northOps.checkForUpdates();
+
+    if (result?.status) {
+      setUpdateState(result.status);
+      setUpdateStatus(result.message || "Pronto");
+      return;
+    }
+
+    setUpdateState("none");
+    setUpdateStatus("Nenhuma atualização disponível.");
+  } catch {
+    setUpdateState("error");
+    setUpdateStatus("Não foi possível verificar atualizações.");
   }
+}
 
   async function applyFineAndCancelFlight(reason: string, fine: number, clientStatus: string) {
 
@@ -1258,8 +1272,15 @@ function App() {
 
     if (window.northOps?.checkForUpdates) {
       try {
-        await window.northOps.checkForUpdates();
+        const result = await window.northOps.checkForUpdates();
+
+        if (result?.status) {
+          setUpdateState(result.status);
+          setUpdateStatus(result.message || "Pronto");
+        }
       } catch {
+        setUpdateState("error");
+        setUpdateStatus("Não foi possível verificar atualizações.");
         setMessage("Não foi possível verificar atualizações. Continuando login...");
       }
     }
@@ -1696,45 +1717,16 @@ function App() {
   const fuelPercent = getFuelPercent(simData);
   const updatePendingInstall = updateState === "downloaded";
 
+  useEffect(() => {
+    localStorage.setItem("northops_compact_mode", String(compactMode));
+  }, [compactMode]);
+
   return (
-    <main className="app-shell">
+
+  <main className={compactMode ? "app-shell compact-mode" : "app-shell"}>
+
       <header className="app-header">
-        <div>
-          <h1>NORTH OPS</h1>
-          <p>Cliente Operacional</p>
-        </div>
-
-        <div className="header-status">
-          <StatusDot online={!!user} label={user ? "Piloto conectado" : "Offline"} />
-          <StatusDot
-            online={!!simData?.connected}
-            label={simData?.connected ? "MSFS online" : "MSFS offline"}
-          />
-          <StatusDot
-            online={!!simData?.on_ground}
-            label={simData?.on_ground ? "Em solo" : "Em voo"}
-          />
-        </div>
-
-        <div className="update-box">
-          <span>Versão v{appVersion}</span>
-
-          <button
-            onClick={handleUpdateButton}
-            disabled={updateState === "checking" || updateState === "downloading"}
-          >
-            {updateState === "checking" && "Verificando..."}
-            {updateState === "available" && "Atualizar agora"}
-            {updateState === "downloading" && `Baixando ${updatePercent}%`}
-            {updateState === "downloaded" && "Reiniciar e instalar"}
-            {(updateState === "idle" ||
-              updateState === "none" ||
-              updateState === "error") &&
-              "Verificar atualização"}
-          </button>
-
-          <small>{updateStatus}</small>
-        </div>
+        <h1>Cliente North Ops</h1>
       </header>
 
       {!user && (
@@ -1771,18 +1763,95 @@ function App() {
           </form>
         </section>
       )}
+      {user && (
+      <div className="bottom-status-bar">
+        
+        <StatusDot online={!!user} label={user ? "Piloto conectado" : "Offline"} />
+
+        <StatusDot
+          online={!!simData?.connected}
+          label={simData?.connected ? "MSFS online" : "MSFS offline"}
+        />
+
+        <StatusDot
+          online={!!simData?.on_ground}
+          label={simData?.on_ground ? "Em solo" : "Em voo"}
+        />
+
+        <button
+          type="button"
+          className="compact-toggle"
+          onClick={() => {
+            const next = !compactMode;
+            setCompactMode(next);
+            (window as any).northOps?.setCompactMode?.(next);
+          }}
+
+        >
+          {compactMode ? "Modo normal" : "Modo compacto"}
+        </button>
+
+      <div className="update-control">
+
+        <button
+          className="update-button-secondary"
+          onClick={handleUpdateButton}
+          disabled={updateState === "checking" || updateState === "downloading"}
+        >
+          {updateState === "checking" && "Verificando..."}
+          {updateState === "available" && "Atualizar agora"}
+          {updateState === "downloading" && `Baixando ${updatePercent}%`}
+          {updateState === "downloaded" && "Reiniciar e instalar"}
+          {(updateState === "idle" || updateState === "none" || updateState === "error") &&
+            "Verificar atualização"}
+        </button>
+
+        <span className="client-version">
+          Versão {appVersion && appVersion !== "?" ? appVersion : ""}
+        </span>
+
+        <span className="update-status-text">
+          {updateStatus}
+        </span>        
+             
+          
+      </div>
+      </div>
+      )}
 
       {user && activeMission && (
         <section className="cockpit">
           <div className="mission-card">
+          <div className="mission-topline">
             <span className="tag">MISSÃO ATIVA</span>
-            <h2>{activeMission.title}</h2>
+            <strong>{activeMission.type || "OPERAÇÃO"}</strong>
+          </div>
 
-            <div className="mission-route">
-              <strong>{activeMission.origin}</strong>
-              <span>→</span>
-              <strong>{activeMission.destination}</strong>
+          <div className="mission-airports">
+            <strong>{activeMission.origin}</strong>
+            <span>→</span>
+            <strong>{activeMission.destination}</strong>
+          </div>
+
+          <h2>{activeMission.title}</h2>
+
+          <div className="mission-quick-info">
+            <div>
+              <span>Distância</span>
+              <strong>{Number(activeMission.distance_nm || 0).toFixed(0)} NM</strong>
             </div>
+
+            <div>
+              <span>Pagamento</span>
+              <strong>{Number(activeMission.payment || 0).toLocaleString("pt-BR")} NOC</strong>
+            </div>
+
+            <div>
+              <span>Aeronave</span>
+              <strong>{activeMission.aircraft || "Não definida"}</strong>
+            </div>
+          </div>
+
 
             <div className="status-message">{message}</div>
 
@@ -1830,17 +1899,27 @@ function App() {
             </div>
           </div>
 
-          <div className="progress-card">
-            <div
-              className="progress-ring"
-              style={{ "--progress": `${progressPercent}%` } as React.CSSProperties}
-            >
-              <div className="progress-inner">
-                <strong>{Math.max(0, distanceToDestination).toFixed(1)}</strong>
-                <span>NM restantes</span>
-              </div>
+  <div className="flight-panel">
+  <div className="flight-panel-header">
+    <span>
+      PROGRESSO DO VOO • {Math.max(0, distanceToDestination).toFixed(1)} NM restantes
+    </span>
+
+    <strong>{progressPercent.toFixed(0)}%</strong>
+  </div>
+  
+
+  <div className="flight-progress-bar">
+    <div
+      className="flight-progress-fill"
+      style={{ width: `${progressPercent}%` }}
+    />
+  </div>
+
+            <div className="flight-panel-grid">
             </div>
           </div>
+
 
           <div className="telemetry-strip compact">
             <div className="aircraft-summary-card">
@@ -1857,35 +1936,17 @@ function App() {
 
             <FuelMetric fuel={fuelPercent} />
 
-            <ProgressMetric
-              icon="📦"
-              label="Integridade da carga"
-              value={liveScores.cargoIntegrity}
-              detail={`${Math.round(activeMission.cargo_weight_kg || 0)} kg`}
+            <CargoMetric
+              cargoWeight={Number(activeMission.cargo_weight_kg || 0)}
+              integrity={liveScores.cargoIntegrity}
             />
 
-            <ProgressMetric
-              icon="🧍"
-              label="Satisfação pax"
-              value={liveScores.passengerSatisfaction}
-              detail={`${Math.round(activeMission.passenger_weight_kg || 0)} kg`}
+            <PassengerMetric
+              passengers={Number(activeMission.passengers || 0)}
+              passengerWeight={Number(activeMission.passenger_weight_kg || 0)}
+              satisfaction={liveScores.passengerSatisfaction}
             />
 
-            <Metric
-              label="💰 Pagamento"
-              value={`${activeMission.payment?.toLocaleString("pt-BR")} NOC`}
-              className="payment-card"
-            />
-
-            <Metric
-              label="📍 Velocidade"
-              value={`${Math.round(simData?.ground_speed || 0)} kt`}
-            />
-
-            <Metric
-              label="⛽ Planejado"
-              value={`${Math.round(activeMission.fuel_planned_lbs || activeMission.fuel_required_lbs || 0)} lb`}
-            />
           </div>
         </section>
       )}
@@ -1966,23 +2027,41 @@ function StatusDot({ online, label }: { online: boolean; label: string }) {
   );
 }
 
-function Metric({
-  label,
-  value,
-  className = "",
+
+function PassengerMetric({
+  passengers,
+  passengerWeight,
+  satisfaction,
 }: {
-  label: string;
-  value: string;
-  className?: string;
+  passengers: number;
+  passengerWeight: number;
+  satisfaction: number;
 }) {
   return (
-    <div className={`metric ${className}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="metric passenger-metric">
+      <span>👥 Passageiros</span>
+      <strong>{passengers} pax</strong>
+      <small>Peso total: {Math.round(passengerWeight)} kg</small>
+      <small>Satisfação: {Math.round(satisfaction)}%</small>
     </div>
   );
 }
 
+function CargoMetric({
+  cargoWeight,
+  integrity,
+}: {
+  cargoWeight: number;
+  integrity: number;
+}) {
+  return (
+    <div className="metric cargo-metric">
+      <span>📦 Carga</span>
+      <strong>{Math.round(cargoWeight)} kg</strong>
+      <small>Integridade: {Math.round(integrity)}%</small>
+    </div>
+  );
+}
 
 function ProgressMetric({
   icon,

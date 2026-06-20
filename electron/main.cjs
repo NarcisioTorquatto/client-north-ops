@@ -20,21 +20,20 @@ function sendToRenderer(channel, data) {
 }
 
 function createWindow() {
-mainWindow = new BrowserWindow({
-  width: 1200,
-  height: 800,
-  minWidth: 1000,
-  minHeight: 700,
-  backgroundColor: "#020817",
+  mainWindow = new BrowserWindow({
+    width: 940,
+    height: 720,
+    minWidth: 900,
+    minHeight: 720,
+    backgroundColor: "#020817",
+    icon: path.join(__dirname, "../resources/icon.ico"),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
 
-  icon: path.join(__dirname, "../resources/icon.ico"),
-
-  webPreferences: {
-    preload: path.join(__dirname, "preload.cjs"),
-    contextIsolation: true,
-    nodeIntegration: false,
-  },
-});  
   if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools();
@@ -42,8 +41,6 @@ mainWindow = new BrowserWindow({
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 }
-
-
 
 function getBridgePath() {
   if (isDev) {
@@ -62,13 +59,11 @@ function sendBridgeStatus(status) {
     altitude_ft: null,
     ground_speed: null,
     heading: null,
-
     g_force: null,
     bank_degrees: null,
     pitch_degrees: null,
     vertical_speed: null,
     airspeed_indicated: null,
-
     fuel_percent: null,
     fuel_total_quantity: null,
     fuel_total_capacity: null,
@@ -151,8 +146,6 @@ function setupUpdater() {
     });
   });
 
-
-
   autoUpdater.on("update-not-available", () => {
     sendToRenderer("update-status", {
       status: "none",
@@ -184,18 +177,53 @@ function setupUpdater() {
 }
 
 ipcMain.handle("get-app-version", () => {
-  return app.getVersion();
+  const packageJson = require("../package.json");
+  return packageJson.version;
+});
+
+ipcMain.handle("set-compact-mode", (_event, compact) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (compact) {
+    mainWindow.setMinimumSize(620, 780);
+    mainWindow.setSize(680, 780);
+    mainWindow.center();
+    return;
+  }
+
+  mainWindow.setMinimumSize(900, 720);
+  mainWindow.setSize(940, 720);
+  mainWindow.center();
 });
 
 ipcMain.handle("check-for-updates", async () => {
   if (isDev) {
     return {
-      status: "dev",
+      status: "none",
       message: "Atualizações só funcionam no app instalado.",
     };
   }
 
-  return await autoUpdater.checkForUpdates();
+  try {
+    const result = await autoUpdater.checkForUpdates();
+
+    if (!result?.updateInfo?.version) {
+      return {
+        status: "none",
+        message: "Você já está na versão mais recente.",
+      };
+    }
+
+    return {
+      status: "available",
+      message: `Atualização disponível: v${result.updateInfo.version}`,
+    };
+  } catch {
+    return {
+      status: "error",
+      message: "Erro ao verificar atualização.",
+    };
+  }
 });
 
 ipcMain.handle("download-update", async () => {
@@ -244,12 +272,6 @@ app.whenReady().then(() => {
   createWindow();
   startSimBridge();
   setupUpdater();
-
-  if (!isDev) {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch(() => {});
-    }, 5000);
-  }
 });
 
 app.on("window-all-closed", () => {
