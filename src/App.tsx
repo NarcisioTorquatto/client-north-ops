@@ -612,7 +612,6 @@ function App() {
   const [aircraftCondition, setAircraftCondition] = useState(100);
 
   const [appVersion, setAppVersion] = useState("...");
-  const [updateStatus, setUpdateStatus] = useState("Pronto");
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updatePercent, setUpdatePercent] = useState(0);
 
@@ -686,7 +685,6 @@ function App() {
       const status = data.status || "idle";
 
       setUpdateState(status);
-      setUpdateStatus(data.message || "Pronto");
 
       if (status === "downloading") setUpdatePercent(Number(data.percent || 0));
       if (status === "downloaded") setUpdatePercent(100);
@@ -778,7 +776,6 @@ async function handleUpdateButton() {
   try {
     if (updateState === "available") {
       setUpdateState("downloading");
-      setUpdateStatus("Baixando atualização...");
       await window.northOps.downloadUpdate();
       return;
     }
@@ -789,21 +786,17 @@ async function handleUpdateButton() {
     }
 
     setUpdateState("checking");
-    setUpdateStatus("Verificando atualizações...");
 
     const result = await window.northOps.checkForUpdates();
 
     if (result?.status) {
       setUpdateState(result.status);
-      setUpdateStatus(result.message || "Pronto");
       return;
     }
 
     setUpdateState("none");
-    setUpdateStatus("Nenhuma atualização disponível.");
   } catch {
     setUpdateState("error");
-    setUpdateStatus("Não foi possível verificar atualizações.");
   }
 }
 
@@ -1276,11 +1269,10 @@ async function handleUpdateButton() {
 
         if (result?.status) {
           setUpdateState(result.status);
-          setUpdateStatus(result.message || "Pronto");
+
         }
       } catch {
         setUpdateState("error");
-        setUpdateStatus("Não foi possível verificar atualizações.");
         setMessage("Não foi possível verificar atualizações. Continuando login...");
       }
     }
@@ -1725,6 +1717,10 @@ async function handleUpdateButton() {
 
   <main className={compactMode ? "app-shell compact-mode" : "app-shell"}>
 
+  <span className="app-version-corner">
+    v{appVersion && appVersion !== "?" ? appVersion : ""}
+  </span>
+
       <header className="app-header">
         <h1>Cliente North Ops</h1>
       </header>
@@ -1805,16 +1801,8 @@ async function handleUpdateButton() {
           {(updateState === "idle" || updateState === "none" || updateState === "error") &&
             "Verificar atualização"}
         </button>
-
-        <span className="client-version">
-          Versão {appVersion && appVersion !== "?" ? appVersion : ""}
-        </span>
-
-        <span className="update-status-text">
-          {updateStatus}
-        </span>        
-             
-          
+        
+               
       </div>
       </div>
       )}

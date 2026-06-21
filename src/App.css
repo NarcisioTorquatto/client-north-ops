@@ -13,7 +13,7 @@ body,
 }
 
 body {
-  overflow: hidden;
+  overflow: auto;
 }
 
 .app-shell {
@@ -143,7 +143,8 @@ button.danger {
 }
 
 .compact-toggle,
-.update-box button {
+.update-control button {
+
   min-width: 170px;
   background: linear-gradient(180deg, #334155, #1e293b);
   color: #e5e7eb;
@@ -554,7 +555,7 @@ button.danger {
 }
 
 .compact-mode .compact-toggle,
-.compact-mode .update-box button {
+.compact-mode .update-control button {  
   min-width: 130px;
   padding: 7px 9px;
   font-size: 9px;
@@ -763,25 +764,20 @@ button.danger {
 .remember-login {
   justify-content: flex-start;
 }
-.client-version {
-  color: #94a3b8;
-  font-size: 10px;
-  font-weight: 800;
-}
-
 .update-control {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
 }
 
-.update-status-text {
-  color: #cbd5e1;
+.app-version-corner {
+  position: fixed;
+  right: 10px;
+  bottom: 6px;
+  z-index: 50;
+  color: #64748b;
   font-size: 9px;
   font-weight: 800;
-  text-align: center;
-  max-width: 170px;
+  opacity: 0.65;
 }
 
 .client-version {

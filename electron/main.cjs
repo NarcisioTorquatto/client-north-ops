@@ -21,10 +21,11 @@ function sendToRenderer(channel, data) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 940,
-    height: 720,
+    width: 980,
+    height: 740,
     minWidth: 900,
-    minHeight: 720,
+    minHeight: 720,    
+    
     backgroundColor: "#020817",
     icon: path.join(__dirname, "../resources/icon.ico"),
     webPreferences: {
@@ -185,14 +186,14 @@ ipcMain.handle("set-compact-mode", (_event, compact) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
   if (compact) {
-    mainWindow.setMinimumSize(620, 780);
+    mainWindow.setMinimumSize(620, 680);
     mainWindow.setSize(680, 780);
     mainWindow.center();
     return;
   }
 
   mainWindow.setMinimumSize(900, 720);
-  mainWindow.setSize(940, 720);
+  mainWindow.setSize(980, 740);
   mainWindow.center();
 });
 
@@ -200,7 +201,7 @@ ipcMain.handle("check-for-updates", async () => {
   if (isDev) {
     return {
       status: "none",
-      message: "Atualizações só funcionam no app instalado.",
+      message: "",
     };
   }
 
