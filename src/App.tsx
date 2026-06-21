@@ -1,3 +1,4 @@
+//
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { supabaseClient } from "./services/supabaseClient";
 import "./App.css";
