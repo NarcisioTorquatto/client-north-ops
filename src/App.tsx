@@ -84,7 +84,41 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "asoboc172",
       "asobocessna172",
     ],
+    [
+      "cessna206",
+      "cessnac206",
+      "c206",
+      "stationair",
+      "cessnastationair",
 
+      "cessnat206hstationair",
+      "cessnat206h",
+      "t206hstationair",
+      "t206h",
+
+      "cessna206stationair",
+      "cessnac206stationair",
+      "c206stationair",
+
+      "cessnau206",
+      "cessnau206g",
+      "u206",
+      "u206g",
+      "u206stationair",
+
+      "cessnatu206",
+      "cessnatu206g",
+      "tu206",
+      "tu206g",
+      "tu206stationair",
+
+      "carenadoc206",
+      "carenadocessna206",
+      "carenadostationair",
+      "carenadoc206stationair",
+      "carenadot206h",
+      "carenadot206hstationair"
+    ],
     [
       "piperpa28warriorii",
       "piperpa28161warriorii",
