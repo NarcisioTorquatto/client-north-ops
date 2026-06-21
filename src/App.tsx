@@ -120,6 +120,47 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "carenadot206hstationair"
     ],
     [
+      "cessna207",
+      "cessnac207",
+      "c207",
+
+      "cessnat207",
+      "cessnat207a",
+      "t207",
+      "t207a",
+
+      "stationair8",
+      "stationair8ii",
+      "stationairii",
+
+      "cessnat207astationair",
+      "cessnat207astationair8",
+      "cessnat207astationair8ii",
+
+      "t207astationair",
+      "t207astationair8",
+      "t207astationair8ii",
+
+      "cessna207stationair",
+      "cessna207stationair8",
+      "cessna207stationair8ii",
+
+      "c207stationair",
+      "c207stationair8",
+      "c207stationair8ii",
+
+      "stationair",
+      "stationair8ii",
+
+      "carenadot207a",
+      "carenadot207",
+      "carenadoc207",
+      "carenadostationair",
+      "carenadostationair8",
+      "carenadostationair8ii",
+      "carenadot207astationair8ii"
+    ],
+    [
       "piperpa28warriorii",
       "piperpa28161warriorii",
       "pa28warriorii",
