@@ -1,4 +1,3 @@
-//
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { supabaseClient } from "./services/supabaseClient";
 import "./App.css";
@@ -12,7 +11,6 @@ const MAX_SAFE_G_FORCE = 1.7;
 const MAX_SAFE_BANK_ANGLE = 50;
 const MAX_SAFE_PITCH_ANGLE = 25;
 const MAX_SAFE_DESCENT_RATE = -1500;
-const HARD_LANDING_DESCENT_RATE = -700;
 const HIGH_LANDING_SPEED = 95;
 
 
@@ -734,7 +732,9 @@ function App() {
   const touchdownFpmRef = useRef(0);
   const touchdownGForceRef = useRef(1);
   const touchdownSpeedRef = useRef(0);
-
+  const lastAirborneVerticalSpeedRef = useRef(0);
+  const lastAirborneGForceRef = useRef(1);
+  const lastAirborneAirspeedRef = useRef(0);
   const flightEventsRef = useRef<any[]>([]);
   const maxGForceRef = useRef(1);
   const maxBankAngleRef = useRef(0);
@@ -1084,6 +1084,12 @@ async function handleUpdateButton() {
         return;
       }
 
+      if (!Boolean(currentSimData.on_ground)) {
+        lastAirborneVerticalSpeedRef.current = verticalSpeed;
+        lastAirborneGForceRef.current = displayGForce;
+        lastAirborneAirspeedRef.current = Number(airspeed || 0);
+      }
+
       const payload = {
         user_id: user.id,
         active_mission_id: activeMission.id,
@@ -1117,27 +1123,33 @@ async function handleUpdateButton() {
     const isNowOnGround = Boolean(payload.sim_on_ground);
 
     if (!wasOnGround && isNowOnGround && !touchdownCapturedRef.current) {
+      const touchdownFpm = -Math.abs(Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0));
+      const touchdownGForce = Number(lastAirborneGForceRef.current || displayGForce || 1);
+      const touchdownSpeed = Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+
       touchdownCapturedRef.current = true;
-      touchdownFpmRef.current = verticalSpeed;
-      touchdownGForceRef.current = displayGForce;
-      touchdownSpeedRef.current = Number(airspeed || payload.ground_speed || 0);
+      touchdownFpmRef.current = touchdownFpm;
+      touchdownGForceRef.current = touchdownGForce;
+      touchdownSpeedRef.current = touchdownSpeed;
 
-      const landingGrade = getLandingGrade(verticalSpeed, displayGForce);
 
-      if (getLandingImpactLevel(verticalSpeed, displayGForce) === "hard") {
+
+      const landingGrade = getLandingGrade(touchdownFpm, touchdownGForce);
+
+      if (getLandingImpactLevel(touchdownFpm, touchdownGForce) === "hard") {
         addFlightEvent(flightEventsRef, {
           code: "hard_landing",
           type: "danger",
           title: "Pouso duro",
-          message: `Toque detectado com ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
           penalty: 3,
         });
-      } else if (getLandingImpactLevel(verticalSpeed, displayGForce) === "firm") {
+      } else if (getLandingImpactLevel(touchdownFpm, touchdownGForce) === "firm") {
         addFlightEvent(flightEventsRef, {
           code: "firm_landing",
           type: "warning",
           title: "Pouso firme",
-          message: `Toque detectado com ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
           penalty: 1,
         });
       } else {
@@ -1145,7 +1157,7 @@ async function handleUpdateButton() {
           code: "good_landing",
           type: "positive",
           title: "Pouso controlado",
-          message: `Toque ${landingGrade}: ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          message: `Toque ${landingGrade}: ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
           penalty: 0,
         });
       }
@@ -1162,16 +1174,6 @@ async function handleUpdateButton() {
           landingSpeedRef.current,
           Number(airspeed || payload.ground_speed || 0)
         );
-
-        if (verticalSpeed < HARD_LANDING_DESCENT_RATE) {
-          addFlightEvent(flightEventsRef, {
-            code: "hard_landing",
-            type: "danger",
-            title: "Pouso duro",
-            message: `Impacto no pouso com razão vertical de ${Math.round(verticalSpeed)} ft/min.`,
-            penalty: 3,
-          });
-        }
 
         if (airspeed > HIGH_LANDING_SPEED) {
           addFlightEvent(flightEventsRef, {
@@ -1474,6 +1476,14 @@ async function handleUpdateButton() {
       maxPitchAngleRef.current = 0;
       maxDescentRateRef.current = 0;
       landingSpeedRef.current = 0;
+      touchdownFpmRef.current = 0;
+      touchdownGForceRef.current = 1;
+      touchdownSpeedRef.current = 0;
+      lastAirborneVerticalSpeedRef.current = 0;
+      lastAirborneGForceRef.current = 1;
+      lastAirborneAirspeedRef.current = 0;
+      previousOnGroundRef.current = true;
+      touchdownCapturedRef.current = false;
 
       setCheatMessage("");
       setLastEvaluation(null);
@@ -1572,7 +1582,8 @@ async function handleUpdateButton() {
 
       touchdownFpm: touchdownFpmRef.current,
       touchdownGForce: touchdownGForceRef.current,
-      touchdownSpeed: touchdownSpeedRef.current,      
+      touchdownSpeed: touchdownSpeedRef.current,
+
       mission: activeMission,
       events: flightEventsRef.current,
       baseXp,
@@ -1634,9 +1645,12 @@ async function handleUpdateButton() {
       landing_grade: evaluation.landingGrade,
       landing_score: Math.max(
         0,
-        100 -
-          Math.abs(Number(evaluation.touchdownFpm || 0)) * 0.12 -
-          Number(evaluation.touchdownGForce || 1) * 8
+        Math.min(
+          100,
+          100 -
+            Math.abs(Number(evaluation.touchdownFpm || 0)) * 0.08 -
+            Math.max(0, Number(evaluation.touchdownGForce || 1) - 1) * 25
+        )
       ),
 
 
@@ -1803,6 +1817,14 @@ async function handleUpdateButton() {
     maxPitchAngleRef.current = 0;
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
+    touchdownFpmRef.current = 0;
+    touchdownGForceRef.current = 1;
+    touchdownSpeedRef.current = 0;
+    lastAirborneVerticalSpeedRef.current = 0;
+    lastAirborneGForceRef.current = 1;
+    lastAirborneAirspeedRef.current = 0;
+    previousOnGroundRef.current = true;
+    touchdownCapturedRef.current = false;
 
     await loadActiveMission(user.id);
 
@@ -1861,6 +1883,14 @@ async function handleUpdateButton() {
     maxPitchAngleRef.current = 0;
     maxDescentRateRef.current = 0;
     landingSpeedRef.current = 0;
+    touchdownFpmRef.current = 0;
+    touchdownGForceRef.current = 1;
+    touchdownSpeedRef.current = 0;
+    lastAirborneVerticalSpeedRef.current = 0;
+    lastAirborneGForceRef.current = 1;
+    lastAirborneAirspeedRef.current = 0;
+    previousOnGroundRef.current = true;
+    touchdownCapturedRef.current = false;
 
     setActiveMission({
       ...activeMission,
