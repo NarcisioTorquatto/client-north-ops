@@ -2051,6 +2051,7 @@ async function handleUpdateButton() {
               </div>
             )}
 
+
             <div className={validationStatus.ok ? "validation ok" : "validation error"}>
               {updatePendingInstall
                 ? "Cliente bloqueado até a atualização ser instalada."
@@ -2137,6 +2138,18 @@ async function handleUpdateButton() {
           </div>
         </section>
       )}
+
+      {user && !activeMission && !lastEvaluation && (
+        <section className="login-card">
+          <h2>Nenhuma missão ativa</h2>
+          <p>Aceite uma missão no site NORTH OPS e depois clique em atualizar.</p>
+
+          <button onClick={() => loadActiveMission(user.id)}>
+            Atualizar missão
+          </button>
+        </section>
+      )}
+
 
         {lastEvaluation && (
           <div className="post-flight-report">
