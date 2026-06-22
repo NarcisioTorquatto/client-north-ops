@@ -7,15 +7,14 @@ const FUEL_CHEAT_FINE = 15000;
 const SIM_RATE_CHEAT_FINE = 25000;
 const CRASH_FINE = 3000;
 const CRASH_REPUTATION_PENALTY = 15;
-
 const FUEL_TOLERANCE_GAL = 3;
-
 const MAX_SAFE_G_FORCE = 1.7;
 const MAX_SAFE_BANK_ANGLE = 50;
 const MAX_SAFE_PITCH_ANGLE = 25;
 const MAX_SAFE_DESCENT_RATE = -1500;
 const HARD_LANDING_DESCENT_RATE = -700;
 const HIGH_LANDING_SPEED = 95;
+
 
 const careerLevels = [
   { level: 1, title: "Aluno Piloto I", minXp: 0, minHours: 0 },
@@ -481,6 +480,9 @@ function addFlightEvent(eventsRef: MutableRefObject<any[]>, event: any) {
 }
 
 function calculatePilotEvaluation({
+  touchdownFpm,
+  touchdownGForce,
+  touchdownSpeed,
   mission,
   events,
   baseXp,
@@ -491,6 +493,9 @@ function calculatePilotEvaluation({
   maxDescentRate,
   landingSpeed,
 }: {
+  touchdownFpm: number;
+  touchdownGForce: number;
+  touchdownSpeed: number;
   mission: any;
   events: any[];
   baseXp: number;
@@ -564,15 +569,16 @@ function calculatePilotEvaluation({
 
   const finalXp = Math.max(0, Math.round(baseXp * xpMultiplier));
 
-  let landingImpactLevel = "normal";
+  const landingImpactLevel = getLandingImpactLevel(touchdownFpm, touchdownGForce);
+  const landingGrade = getLandingGrade(touchdownFpm, touchdownGForce);
 
-  if (finalEvents.some((event) => event.code === "hard_landing")) {
-    landingImpactLevel = "hard";
-  } else if (maxDescentRate < -500) {
-    landingImpactLevel = "firm";
-  }
 
   return {
+
+    touchdownFpm,
+    touchdownGForce,
+    touchdownSpeed,
+    landingGrade,
     pilotRating,
     passengerSatisfaction,
     cargoIntegrity,
@@ -666,6 +672,29 @@ function normalizeHeading(value: any) {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+  function getLandingGrade(fpm: number, gForce: number) {
+    const absFpm = Math.abs(Number(fpm || 0));
+    const g = Number(gForce || 1);
+
+    if (absFpm <= 120 && g <= 1.25) return "Excelente";
+    if (absFpm <= 200 && g <= 1.4) return "Muito bom";
+    if (absFpm <= 300 && g <= 1.6) return "Bom";
+    if (absFpm <= 450 && g <= 1.8) return "Firme";
+    if (absFpm <= 650 && g <= 2.1) return "Duro";
+    return "Muito duro";
+  }
+
+  function getLandingImpactLevel(fpm: number, gForce: number) {
+    const absFpm = Math.abs(Number(fpm || 0));
+    const g = Number(gForce || 1);
+
+    if (absFpm > 650 || g > 2.1) return "hard";
+    if (absFpm > 450 || g > 1.8) return "firm";
+    return "normal";
+  }
+
+
+
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
   const [password, setPassword] = useState(() => localStorage.getItem("northops_password") || "");
@@ -700,6 +729,11 @@ function App() {
   const completingFlightRef = useRef(false);
   const fuelAtStartRef = useRef<number | null>(null);
   const cheatDetectedRef = useRef(false);
+  const previousOnGroundRef = useRef(true);
+  const touchdownCapturedRef = useRef(false);
+  const touchdownFpmRef = useRef(0);
+  const touchdownGForceRef = useRef(1);
+  const touchdownSpeedRef = useRef(0);
 
   const flightEventsRef = useRef<any[]>([]);
   const maxGForceRef = useRef(1);
@@ -1077,6 +1111,49 @@ async function handleUpdateButton() {
       }
 
       if (!destinationAirport) return;
+
+
+    const wasOnGround = previousOnGroundRef.current;
+    const isNowOnGround = Boolean(payload.sim_on_ground);
+
+    if (!wasOnGround && isNowOnGround && !touchdownCapturedRef.current) {
+      touchdownCapturedRef.current = true;
+      touchdownFpmRef.current = verticalSpeed;
+      touchdownGForceRef.current = displayGForce;
+      touchdownSpeedRef.current = Number(airspeed || payload.ground_speed || 0);
+
+      const landingGrade = getLandingGrade(verticalSpeed, displayGForce);
+
+      if (getLandingImpactLevel(verticalSpeed, displayGForce) === "hard") {
+        addFlightEvent(flightEventsRef, {
+          code: "hard_landing",
+          type: "danger",
+          title: "Pouso duro",
+          message: `Toque detectado com ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          penalty: 3,
+        });
+      } else if (getLandingImpactLevel(verticalSpeed, displayGForce) === "firm") {
+        addFlightEvent(flightEventsRef, {
+          code: "firm_landing",
+          type: "warning",
+          title: "Pouso firme",
+          message: `Toque detectado com ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          penalty: 1,
+        });
+      } else {
+        addFlightEvent(flightEventsRef, {
+          code: "good_landing",
+          type: "positive",
+          title: "Pouso controlado",
+          message: `Toque ${landingGrade}: ${Math.round(verticalSpeed)} FPM e ${displayGForce.toFixed(2)}G.`,
+          penalty: 0,
+        });
+      }
+    }
+
+    previousOnGroundRef.current = isNowOnGround;
+
+
 
       const isLanded = payload.sim_on_ground === true && payload.ground_speed < 30;
 
@@ -1492,6 +1569,10 @@ async function handleUpdateButton() {
     const safeRemainingFuel = Math.min(100, Math.max(0, remainingFuelPercent));
 
     const evaluation = calculatePilotEvaluation({
+
+      touchdownFpm: touchdownFpmRef.current,
+      touchdownGForce: touchdownGForceRef.current,
+      touchdownSpeed: touchdownSpeedRef.current,      
       mission: activeMission,
       events: flightEventsRef.current,
       baseXp,
@@ -1547,6 +1628,18 @@ async function handleUpdateButton() {
       max_pitch_angle: evaluation.maxPitchAngle,
       max_descent_rate: evaluation.maxDescentRate,
       landing_speed_kt: evaluation.landingSpeed,
+      touchdown_fpm: evaluation.touchdownFpm,
+      touchdown_g_force: evaluation.touchdownGForce,
+      touchdown_speed_kt: evaluation.touchdownSpeed,
+      landing_grade: evaluation.landingGrade,
+      landing_score: Math.max(
+        0,
+        100 -
+          Math.abs(Number(evaluation.touchdownFpm || 0)) * 0.12 -
+          Number(evaluation.touchdownGForce || 1) * 8
+      ),
+
+
     });
 
     if (logError) {
@@ -2015,72 +2108,77 @@ async function handleUpdateButton() {
         </section>
       )}
 
-      {user && !activeMission && (
-        <section className="login-card">
-          <h2>Nenhuma missão ativa</h2>
-          <p>Aceite uma missão no site NORTH OPS.</p>
+        {lastEvaluation && (
+          <div className="post-flight-report">
+            <div className="post-flight-header">
+              <span className="tag">VOO FINALIZADO</span>
+              <h2>Relatório do voo</h2>
+              <strong>{lastEvaluation.pilotRating}/10</strong>
+              <p>Nota geral de pilotagem</p>
+            </div>
 
-          {lastEvaluation && (
-            <div className="status-message">
-              <h3>Avaliação do último voo</h3>
+            <div className="post-flight-grid">
+              <div>
+                <span>Pagamento</span>
+                <strong>{Number(lastEvaluation.payment || 0).toLocaleString("pt-BR")} NOC</strong>
+              </div>
 
-              <p>
-                Nota de pilotagem: <strong>{lastEvaluation.pilotRating}/10</strong>
-              </p>
+              <div>
+                <span>XP recebido</span>
+                <strong>+{lastEvaluation.xpEarned}</strong>
+              </div>
 
-              {lastEvaluation.passengerSatisfaction !== null && (
-                <p>
-                  Satisfação dos passageiros:{" "}
-                  <strong>{lastEvaluation.passengerSatisfaction}%</strong>
-                </p>
-              )}
-
-              {lastEvaluation.cargoIntegrity !== null && (
-                <p>
-                  Integridade da carga: <strong>{lastEvaluation.cargoIntegrity}%</strong>
-                </p>
-              )}
-
-              <p>
-                Reputação:{" "}
+              <div>
+                <span>Reputação</span>
                 <strong>
                   {lastEvaluation.reputationChange >= 0 ? "+" : ""}
                   {lastEvaluation.reputationChange}
                 </strong>
-              </p>
+              </div>
 
-              <p>
-                XP recebido: <strong>+{lastEvaluation.xpEarned}</strong>
-              </p>
-
-              <p>
-                Combustível restante:{" "}
+              <div>
+                <span>Combustível</span>
                 <strong>{lastEvaluation.remainingFuelPercent}%</strong>
-              </p>
+              </div>
 
-              <div style={{ marginTop: 12 }}>
-                <strong>Eventos:</strong>
+              <div>
+                <span>Classificação do pouso</span>
+                <strong>{lastEvaluation.landingGrade}</strong>
+              </div>
 
-                {lastEvaluation.flightEvents?.map((event: any) => (
-                  <p key={event.code}>
-                    {event.type === "positive"
-                      ? "✅"
-                      : event.type === "danger"
-                      ? "🔴"
-                      : "⚠️"}{" "}
-                    {event.title}
-                  </p>
-                ))}
+              <div>
+                <span>Touchdown FPM</span>
+                <strong>{Math.round(lastEvaluation.touchdownFpm || 0)} FPM</strong>
+              </div>
+
+              <div>
+                <span>Touchdown G</span>
+                <strong>{Number(lastEvaluation.touchdownGForce || 1).toFixed(2)}G</strong>
+              </div>
+
+              <div>
+                <span>Velocidade no toque</span>
+                <strong>{Math.round(lastEvaluation.touchdownSpeed || 0)} kt</strong>
               </div>
             </div>
-          )}
 
-          <button onClick={() => loadActiveMission(user.id)}>Atualizar missão</button>
-        </section>
-      )}
+            <div className="post-flight-events">
+              <h3>Eventos detectados</h3>
+
+              {lastEvaluation.flightEvents?.map((event: any) => (
+                <div className={`post-flight-event ${event.type}`} key={event.code}>
+                  <strong>{event.title}</strong>
+                  <span>{event.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
     </main>
   );
 }
+
 
 function StatusDot({ online, label }: { online: boolean; label: string }) {
   return (

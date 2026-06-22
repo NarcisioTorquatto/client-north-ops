@@ -786,3 +786,115 @@ button.danger {
   font-weight: 900;
   text-align: center;
 }
+
+.post-flight-report {
+  margin-top: 18px;
+}
+
+.post-flight-header {
+  text-align: center;
+  padding: 18px;
+  border-radius: 20px;
+  background: radial-gradient(circle at top, rgba(34, 197, 94, 0.18), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(34, 197, 94, 0.24);
+}
+
+.post-flight-header h2 {
+  margin: 12px 0 4px;
+  font-size: 24px;
+}
+
+.post-flight-header strong {
+  display: block;
+  color: #22c55e;
+  font-size: 44px;
+  font-weight: 950;
+}
+
+.post-flight-header p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.post-flight-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.post-flight-grid div {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(8, 13, 24, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.post-flight-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.post-flight-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.post-flight-events {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(8, 13, 24, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.post-flight-events h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.post-flight-event {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.post-flight-event strong {
+  display: block;
+  font-size: 12px;
+}
+
+.post-flight-event span {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.post-flight-event.positive {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.post-flight-event.warning {
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+.post-flight-event.danger {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.compact-mode .post-flight-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.compact-mode .post-flight-header strong {
+  font-size: 34px;
+}
