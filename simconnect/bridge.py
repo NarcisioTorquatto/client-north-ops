@@ -310,7 +310,7 @@ def main():
                     "engine_running": bool(engine_running),
                 })
 
-                time.sleep(1)
+                time.sleep(0.25)
 
         except Exception as e:
             send({

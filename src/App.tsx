@@ -735,6 +735,12 @@ function App() {
   const lastAirborneVerticalSpeedRef = useRef(0);
   const lastAirborneGForceRef = useRef(1);
   const lastAirborneAirspeedRef = useRef(0);
+
+  const landingSamplesRef = useRef<
+    { time: number; verticalSpeed: number; gForce: number; airspeed: number }[]
+  >([]);
+
+
   const flightEventsRef = useRef<any[]>([]);
   const maxGForceRef = useRef(1);
   const maxBankAngleRef = useRef(0);
@@ -1088,6 +1094,18 @@ async function handleUpdateButton() {
         lastAirborneVerticalSpeedRef.current = verticalSpeed;
         lastAirborneGForceRef.current = displayGForce;
         lastAirborneAirspeedRef.current = Number(airspeed || 0);
+
+
+        landingSamplesRef.current.push({
+          time: Date.now(),
+          verticalSpeed,
+          gForce: displayGForce,
+          airspeed: Number(airspeed || 0),
+        });
+
+        landingSamplesRef.current = landingSamplesRef.current.filter(
+          (sample) => Date.now() - sample.time <= 5000
+        );
       }
 
       const payload = {
@@ -1123,15 +1141,43 @@ async function handleUpdateButton() {
     const isNowOnGround = Boolean(payload.sim_on_ground);
 
     if (!wasOnGround && isNowOnGround && !touchdownCapturedRef.current) {
-      const touchdownFpm = -Math.abs(Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0));
-      const touchdownGForce = Number(lastAirborneGForceRef.current || displayGForce || 1);
-      const touchdownSpeed = Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+      const recentSamples = landingSamplesRef.current;
 
-      touchdownCapturedRef.current = true;
-      touchdownFpmRef.current = touchdownFpm;
-      touchdownGForceRef.current = touchdownGForce;
-      touchdownSpeedRef.current = touchdownSpeed;
+      const touchdownFpm =
+        recentSamples.length > 0
+          ? Math.min(...recentSamples.map((sample) => sample.verticalSpeed))
+          : Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0);
 
+      const touchdownGForce =
+        recentSamples.length > 0
+          ? Math.max(...recentSamples.map((sample) => sample.gForce))
+          : Number(lastAirborneGForceRef.current || displayGForce || 1);
+
+      const touchdownSpeed =
+        recentSamples.length > 0
+          ? recentSamples[recentSamples.length - 1].airspeed
+          : Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+
+      if (
+        !Number.isFinite(touchdownFpm) ||
+        !Number.isFinite(touchdownGForce) ||
+        !Number.isFinite(touchdownSpeed) ||
+        touchdownFpm >= 0 ||
+        touchdownSpeed < 35
+      ) {
+        addFlightEvent(flightEventsRef, {
+          code: "invalid_touchdown_data",
+          type: "warning",
+          title: "Toque não registrado corretamente",
+          message: "FPM/velocidade do toque não foram capturados corretamente. Este pouso não deve contar para ranking.",
+          penalty: 0,
+        });
+      } else {
+        touchdownCapturedRef.current = true;
+        touchdownFpmRef.current = touchdownFpm;
+        touchdownGForceRef.current = touchdownGForce;
+        touchdownSpeedRef.current = touchdownSpeed;
+      }
 
 
       const landingGrade = getLandingGrade(touchdownFpm, touchdownGForce);
@@ -1484,6 +1530,7 @@ async function handleUpdateButton() {
       lastAirborneAirspeedRef.current = 0;
       previousOnGroundRef.current = true;
       touchdownCapturedRef.current = false;
+      landingSamplesRef.current = [];
 
       setCheatMessage("");
       setLastEvaluation(null);
@@ -1825,6 +1872,7 @@ async function handleUpdateButton() {
     lastAirborneAirspeedRef.current = 0;
     previousOnGroundRef.current = true;
     touchdownCapturedRef.current = false;
+    landingSamplesRef.current = [];
 
     await loadActiveMission(user.id);
 
@@ -1891,6 +1939,7 @@ async function handleUpdateButton() {
     lastAirborneAirspeedRef.current = 0;
     previousOnGroundRef.current = true;
     touchdownCapturedRef.current = false;
+    landingSamplesRef.current = [];
 
     setActiveMission({
       ...activeMission,
@@ -2051,7 +2100,6 @@ async function handleUpdateButton() {
               </div>
             )}
 
-
             <div className={validationStatus.ok ? "validation ok" : "validation error"}>
               {updatePendingInstall
                 ? "Cliente bloqueado até a atualização ser instalada."
@@ -2138,18 +2186,6 @@ async function handleUpdateButton() {
           </div>
         </section>
       )}
-
-      {user && !activeMission && !lastEvaluation && (
-        <section className="login-card">
-          <h2>Nenhuma missão ativa</h2>
-          <p>Aceite uma missão no site NORTH OPS e depois clique em atualizar.</p>
-
-          <button onClick={() => loadActiveMission(user.id)}>
-            Atualizar missão
-          </button>
-        </section>
-      )}
-
 
         {lastEvaluation && (
           <div className="post-flight-report">
