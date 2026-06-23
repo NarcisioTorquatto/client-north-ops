@@ -898,3 +898,7 @@ button.danger {
 .compact-mode .post-flight-header strong {
   font-size: 34px;
 }
+.post-flight-refresh-button {
+  width: 100%;
+  margin-top: 14px;
+}

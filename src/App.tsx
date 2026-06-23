@@ -2251,6 +2251,12 @@ async function handleUpdateButton() {
                 </div>
               ))}
             </div>
+            <button
+              className="post-flight-refresh-button"
+              onClick={() => loadActiveMission(user.id)}
+            >
+              Atualizar missão
+            </button>
           </div>
         )}
 
