@@ -2055,6 +2055,34 @@ async function handleUpdateButton() {
       </div>
       )}
 
+      {user && !activeMission && !lastEvaluation && (
+        <section className="cockpit">
+          <div className="no-mission-card">
+            <div className="no-mission-icon">✈️</div>
+
+            <h2>Nenhuma missão ativa</h2>
+
+            <p>
+              Você ainda não possui uma missão em andamento.
+            </p>
+
+            <p>
+              Acesse o site do North Ops, aceite uma missão e depois clique em
+              atualizar.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => loadActiveMission(user.id)}
+              disabled={loading}
+            >
+              {loading ? "Atualizando..." : "Atualizar missões"}
+            </button>
+          </div>
+        </section>
+      )}
+
+
       {user && activeMission && (
         <section className="cockpit">
           <div className="mission-card">
