@@ -747,19 +747,13 @@ function App() {
   const maxPitchAngleRef = useRef(0);
   const maxDescentRateRef = useRef(0);
   const landingSpeedRef = useRef(0);
-
   const lastTelemetrySaveAtRef = useRef(0);
-  const lastTelemetryPointRef = useRef<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-
   const TELEMETRY_SAVE_INTERVAL_MS = 15000;
-  const TELEMETRY_MIN_DISTANCE_NM = 0.25;
-    const [validationStatus, setValidationStatus] = useState({
-      ok: false,
-      message: "Aguardando validação automática.",
-    });
+
+  const [validationStatus, setValidationStatus] = useState({
+    ok: false,
+    message: "Aguardando validação automática.",
+  });
 
   const distanceToDestination =
     simData?.latitude && simData?.longitude && destinationAirport
@@ -1137,25 +1131,10 @@ async function handleUpdateButton() {
 
       const now = Date.now();
 
-      const lastPoint = lastTelemetryPointRef.current;
-
-      const distanceFromLastTelemetry =
-        lastPoint && Number.isFinite(payload.latitude) && Number.isFinite(payload.longitude)
-          ? calculateDistanceNM(
-              lastPoint.latitude,
-              lastPoint.longitude,
-              payload.latitude,
-              payload.longitude
-            )
-          : TELEMETRY_MIN_DISTANCE_NM;
-
       const shouldSaveTelemetry =
         Number.isFinite(payload.latitude) &&
         Number.isFinite(payload.longitude) &&
-        (
-          now - lastTelemetrySaveAtRef.current >= TELEMETRY_SAVE_INTERVAL_MS ||
-          distanceFromLastTelemetry >= TELEMETRY_MIN_DISTANCE_NM
-        );
+        now - lastTelemetrySaveAtRef.current >= TELEMETRY_SAVE_INTERVAL_MS;
 
       if (shouldSaveTelemetry) {
         const { error } = await supabaseClient
@@ -1168,12 +1147,8 @@ async function handleUpdateButton() {
         }
 
         lastTelemetrySaveAtRef.current = now;
-        lastTelemetryPointRef.current = {
-          latitude: payload.latitude,
-          longitude: payload.longitude,
-        };
-      }      
-
+      }
+      
       if (!destinationAirport) return;
 
 
@@ -1919,7 +1894,6 @@ async function handleUpdateButton() {
     touchdownCapturedRef.current = false;
     landingSamplesRef.current = [];
     lastTelemetrySaveAtRef.current = 0;
-    lastTelemetryPointRef.current = null;
 
 
     await loadActiveMission(user.id);
@@ -1972,8 +1946,7 @@ async function handleUpdateButton() {
     completingFlightRef.current = false;
     fuelAtStartRef.current = null;
     cheatDetectedRef.current = false;
-    lastTelemetrySaveAtRef.current = 0;
-    lastTelemetryPointRef.current = null;
+  lastTelemetrySaveAtRef.current = 0;
 
 
     flightEventsRef.current = [];
