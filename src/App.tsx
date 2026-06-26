@@ -748,10 +748,18 @@ function App() {
   const maxDescentRateRef = useRef(0);
   const landingSpeedRef = useRef(0);
 
-  const [validationStatus, setValidationStatus] = useState({
-    ok: false,
-    message: "Aguardando validação automática.",
-  });
+  const lastTelemetrySaveAtRef = useRef(0);
+  const lastTelemetryPointRef = useRef<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  const TELEMETRY_SAVE_INTERVAL_MS = 15000;
+  const TELEMETRY_MIN_DISTANCE_NM = 0.25;
+    const [validationStatus, setValidationStatus] = useState({
+      ok: false,
+      message: "Aguardando validação automática.",
+    });
 
   const distanceToDestination =
     simData?.latitude && simData?.longitude && destinationAirport
@@ -1127,12 +1135,44 @@ async function handleUpdateButton() {
         airspeed_indicated: Number(airspeed),
       };
 
-      const { error } = await supabaseClient.from("flight_telemetry").insert(payload);
+      const now = Date.now();
 
-      if (error) {
-        setMessage(`Erro telemetria: ${error.message}`);
-        return;
-      }
+      const lastPoint = lastTelemetryPointRef.current;
+
+      const distanceFromLastTelemetry =
+        lastPoint && Number.isFinite(payload.latitude) && Number.isFinite(payload.longitude)
+          ? calculateDistanceNM(
+              lastPoint.latitude,
+              lastPoint.longitude,
+              payload.latitude,
+              payload.longitude
+            )
+          : TELEMETRY_MIN_DISTANCE_NM;
+
+      const shouldSaveTelemetry =
+        Number.isFinite(payload.latitude) &&
+        Number.isFinite(payload.longitude) &&
+        (
+          now - lastTelemetrySaveAtRef.current >= TELEMETRY_SAVE_INTERVAL_MS ||
+          distanceFromLastTelemetry >= TELEMETRY_MIN_DISTANCE_NM
+        );
+
+      if (shouldSaveTelemetry) {
+        const { error } = await supabaseClient
+          .from("flight_telemetry")
+          .insert(payload);
+
+        if (error) {
+          setMessage(`Erro telemetria: ${error.message}`);
+          return;
+        }
+
+        lastTelemetrySaveAtRef.current = now;
+        lastTelemetryPointRef.current = {
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+        };
+      }      
 
       if (!destinationAirport) return;
 
@@ -1812,6 +1852,11 @@ async function handleUpdateButton() {
       return;
     }
 
+    await supabaseClient
+      .from("flight_telemetry")
+      .delete()
+      .eq("active_mission_id", activeMission.id);    
+
     const { data: profileStats } = await supabaseClient
       .from("profiles")
       .select("average_rating, evaluated_flights")
@@ -1873,6 +1918,9 @@ async function handleUpdateButton() {
     previousOnGroundRef.current = true;
     touchdownCapturedRef.current = false;
     landingSamplesRef.current = [];
+    lastTelemetrySaveAtRef.current = 0;
+    lastTelemetryPointRef.current = null;
+
 
     await loadActiveMission(user.id);
 
@@ -1924,6 +1972,9 @@ async function handleUpdateButton() {
     completingFlightRef.current = false;
     fuelAtStartRef.current = null;
     cheatDetectedRef.current = false;
+    lastTelemetrySaveAtRef.current = 0;
+    lastTelemetryPointRef.current = null;
+
 
     flightEventsRef.current = [];
     maxGForceRef.current = 1;
