@@ -965,6 +965,11 @@ async function handleUpdateButton() {
         telemetry_finished_at: new Date().toISOString(),
       })
       .eq("id", activeMission.id);
+    
+      await supabaseClient
+      .from("live_positions")
+      .delete()
+      .eq("user_id", user.id);
 
     setActiveMission({
       ...activeMission,
@@ -1136,18 +1141,42 @@ async function handleUpdateButton() {
         Number.isFinite(payload.longitude) &&
         now - lastTelemetrySaveAtRef.current >= TELEMETRY_SAVE_INTERVAL_MS;
 
-      if (shouldSaveTelemetry) {
-        const { error } = await supabaseClient
-          .from("flight_telemetry")
-          .insert(payload);
+    if (shouldSaveTelemetry) {
+      const { error: telemetryError } = await supabaseClient
+        .from("flight_telemetry")
+        .insert(payload);
 
-        if (error) {
-          setMessage(`Erro telemetria: ${error.message}`);
-          return;
-        }
-
-        lastTelemetrySaveAtRef.current = now;
+      if (telemetryError) {
+        setMessage(`Erro telemetria: ${telemetryError.message}`);
+        return;
       }
+
+      lastTelemetrySaveAtRef.current = now;
+    }
+
+    await supabaseClient
+      .from("live_positions")
+      .upsert(
+        {
+          user_id: user.id,
+          active_mission_id: activeMission.id,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          altitude_ft: payload.altitude_ft,
+          ground_speed: payload.ground_speed,
+          heading: payload.heading,
+          fuel_percent: payload.fuel_percent,
+          aircraft: payload.aircraft,
+          sim_on_ground: payload.sim_on_ground,
+          engine_running: payload.engine_running,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        }
+      );
+
+
       
       if (!destinationAirport) return;
 
@@ -1830,7 +1859,12 @@ async function handleUpdateButton() {
     await supabaseClient
       .from("flight_telemetry")
       .delete()
-      .eq("active_mission_id", activeMission.id);    
+      .eq("active_mission_id", activeMission.id);  
+    
+    await supabaseClient
+      .from("live_positions")
+      .delete()
+      .eq("user_id", user.id);      
 
     const { data: profileStats } = await supabaseClient
       .from("profiles")
@@ -1929,6 +1963,11 @@ async function handleUpdateButton() {
 
     await supabaseClient
       .from("flight_telemetry")
+      .delete()
+      .eq("active_mission_id", activeMission.id);
+
+    await supabaseClient
+      .from("live_positions")
       .delete()
       .eq("active_mission_id", activeMission.id);
 
