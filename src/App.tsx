@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { supabaseClient } from "./services/supabaseClient";
 import "./App.css";
 
-const FUEL_CHEAT_FINE = 15000;
+const FUEL_CHEAT_FINE = 1000;
 const SIM_RATE_CHEAT_FINE = 25000;
 const CRASH_FINE = 3000;
 const CRASH_REPUTATION_PENALTY = 15;
@@ -16,15 +16,15 @@ const HIGH_LANDING_SPEED = 95;
 
 const careerLevels = [
   { level: 1, title: "Aluno Piloto I", minXp: 0, minHours: 0 },
-  { level: 2, title: "Aluno Piloto II", minXp: 100, minHours: 2 },
-  { level: 3, title: "Aluno Piloto III", minXp: 300, minHours: 5 },
-  { level: 4, title: "Piloto Privado", minXp: 700, minHours: 10 },
-  { level: 5, title: "Piloto Regional", minXp: 1500, minHours: 20 },
-  { level: 6, title: "Piloto Comercial", minXp: 4000, minHours: 50 },
-  { level: 7, title: "Piloto Sênior", minXp: 9000, minHours: 100 },
-  { level: 8, title: "Comandante Regional", minXp: 18000, minHours: 250 },
-  { level: 9, title: "Comandante Comercial", minXp: 35000, minHours: 500 },
-  { level: 10, title: "Comandante Executivo", minXp: 70000, minHours: 1000 },
+  { level: 2, title: "Aluno Piloto II", minXp: 250, minHours: 3 },
+  { level: 3, title: "Aluno Piloto III", minXp: 750, minHours: 8 },
+  { level: 4, title: "Piloto Privado", minXp: 1800, minHours: 20 },
+  { level: 5, title: "Piloto Regional", minXp: 4000, minHours: 40 },
+  { level: 6, title: "Piloto Comercial", minXp: 8000, minHours: 80 },
+  { level: 7, title: "Piloto Sênior", minXp: 15000, minHours: 150 },
+  { level: 8, title: "Comandante Regional", minXp: 30000, minHours: 300 },
+  { level: 9, title: "Comandante Comercial", minXp: 55000, minHours: 600 },
+  { level: 10, title: "Comandante Executivo", minXp: 100000, minHours: 1200 },
 ];
 
 type UpdateState =
@@ -434,38 +434,97 @@ function getFuelPercent(simData: any) {
   return 0;
 }
 
-function calculateFlightXp(mission: any) {
-  const distance = Number(mission.distance_nm || 0);
-  const payloadKg = Number(mission.payload_total_kg || mission.weight_kg || 0);
+function calculateFlightXp(mission: any, landingScore = 10, usedCheat = false) {
+  if (usedCheat) return 0;
 
-  let xp = Math.round(distance * 0.8);
+  const distanceNm = Number(mission.distance_nm || 0);
 
-  xp += 40;
-  xp += Math.round(payloadKg / 40);
+  let xp = Math.round(distanceNm * 1.1);
 
-  if (mission.is_remote) xp += 35;
+  xp += 25;
 
-  if (mission.risk === "Alto") xp += 60;
-  if (mission.risk === "Médio") xp += 30;
+  if (mission.is_remote) xp += 60;
 
-  return Math.max(30, xp);
+  if (mission.risk === "Alto") xp += 100;
+  if (mission.risk === "Médio") xp += 40;
+
+  switch (mission.type) {
+    case "Carga simples":
+    case "Passageiros locais":
+    case "Frete rural":
+    case "Frangos vivos":
+      xp -= 20;
+      break;
+
+    case "Remédios e insumos":
+    case "Pescado refrigerado":
+    case "Frango congelado":
+    case "Equipe da prefeitura":
+      xp += 15;
+      break;
+
+    case "Malote bancário":
+    case "Transporte funerário":
+    case "Cantor em evento municipal":
+      xp += 30;
+      break;
+
+    case "Aero médico":
+    case "Carga perigosa":
+    case "Transporte de autoridade":
+      xp += 60;
+      break;
+
+    case "Apoio a comunidade isolada":
+    case "Garimpo":
+      xp += 90;
+      break;
+  }
+
+  if (landingScore >= 9) xp += 50;
+  else if (landingScore >= 7) xp += 25;
+  else if (landingScore < 5) xp -= 50;
+
+  return Math.max(0, Math.round(xp));
 }
 
-function getPaymentBonus(level: number, isPremium: boolean) {
-  let bonus = 0;
 
-  if (level >= 10) bonus += 0.16;
-  else if (level >= 9) bonus += 0.14;
-  else if (level >= 8) bonus += 0.12;
-  else if (level >= 7) bonus += 0.1;
-  else if (level >= 6) bonus += 0.08;
-  else if (level >= 5) bonus += 0.05;
-  else if (level >= 4) bonus += 0.03;
+function getPaymentMultiplier({
+  level,
+  reputation,
+  isPremium,
+}: {
+  level: number;
+  reputation: number;
+  isPremium?: boolean;
+}) {
+  const safeLevel = Number(level || 1);
+  const safeReputation = Number(reputation || 100);
 
-  if (isPremium) bonus += 0.1;
+  let multiplier = 1;
 
-  return bonus;
+  if (safeLevel <= 1) multiplier = 0.65;
+  else if (safeLevel === 2) multiplier = 0.75;
+  else if (safeLevel === 3) multiplier = 0.85;
+  else if (safeLevel === 4) multiplier = 1;
+  else if (safeLevel === 5) multiplier = 1.08;
+  else if (safeLevel === 6) multiplier = 1.15;
+  else if (safeLevel === 7) multiplier = 1.25;
+  else if (safeLevel === 8) multiplier = 1.35;
+  else if (safeLevel === 9) multiplier = 1.45;
+  else if (safeLevel >= 10) multiplier = 1.6;
+
+  if (safeReputation >= 95) multiplier += 0.15;
+  else if (safeReputation >= 90) multiplier += 0.1;
+  else if (safeReputation >= 80) multiplier += 0.05;
+  else if (safeReputation < 60) multiplier -= 0.2;
+  else if (safeReputation < 75) multiplier -= 0.1;
+
+  if (isPremium) multiplier += 0.1;
+
+  return Math.max(0.4, multiplier);
 }
+
 
 function addFlightEvent(eventsRef: MutableRefObject<any[]>, event: any) {
   const alreadyExists = eventsRef.current.some((item) => item.code === event.code);
@@ -1668,7 +1727,7 @@ async function handleUpdateButton() {
 
     const currentCareer = getCareerLevelFromXpAndHours(currentXp, previousTotalHours);
 
-    const baseXp = calculateFlightXp(activeMission);
+    const baseXp = calculateFlightXp(activeMission, 10, cheatDetectedRef.current);
 
     const currentSimData = simDataRef.current;
     const remainingFuelPercent = Math.round(getFuelPercent(currentSimData));
@@ -1703,9 +1762,14 @@ async function handleUpdateButton() {
     );
 
     const basePayment = Number(activeMission.payment || 0);
-    const paymentBonus = getPaymentBonus(currentCareer.level, isPremium);
-    const finalPayment = Math.round(basePayment + basePayment * paymentBonus);
+    const paymentMultiplier = getPaymentMultiplier({
+      level: currentCareer.level,
+      reputation: currentReputation,
+      isPremium,
+    });
 
+const finalPayment = Math.round(basePayment * paymentMultiplier);
+    
     const { error: logError } = await supabaseClient.from("flight_logs").insert({
       user_id: user.id,
       mission_id: activeMission.id,
