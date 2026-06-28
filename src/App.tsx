@@ -1770,7 +1770,10 @@ async function handleUpdateButton() {
 
 const finalPayment = Math.round(basePayment * paymentMultiplier);
     
-    const { error: logError } = await supabaseClient.from("flight_logs").insert({
+  const { data: flightLogData, error: logError } = await supabaseClient
+    .from("flight_logs")
+    .insert({
+
       user_id: user.id,
       mission_id: activeMission.id,
       title: activeMission.title,
@@ -1814,13 +1817,28 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       ),
 
 
-    });
+  })
+  .select("id")
+  .single();
+    
 
     if (logError) {
       setMessage(`Erro flight log: ${logError.message}`);
       completingFlightRef.current = false;
       return;
     }
+
+    await supabaseClient.from("career_diary").insert({
+      user_id: user.id,
+      flight_log_id: flightLogData?.id || null,
+      active_mission_id: activeMission.id,
+      event_type: "flight_completed",
+      title: "Voo concluído",
+      description: `${activeMission.origin} → ${activeMission.destination} com ${activeMission.aircraft}. Nota ${evaluation.pilotRating}/10 e pouso ${evaluation.landingGrade}.`,
+      origin: activeMission.origin,
+      destination: activeMission.destination,
+      aircraft: activeMission.aircraft,
+    });    
 
     const { data: wallet } = await supabaseClient
       .from("wallets")
