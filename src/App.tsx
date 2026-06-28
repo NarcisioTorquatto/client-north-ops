@@ -1151,6 +1151,11 @@ async function handleUpdateButton() {
         return;
       }
 
+      await supabaseClient.rpc("cleanup_old_flight_telemetry", {
+        p_active_mission_id: activeMission.id,
+        p_keep_last: 100,
+      });
+
       lastTelemetrySaveAtRef.current = now;
     }
 
