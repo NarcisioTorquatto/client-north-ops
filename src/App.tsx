@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { supabaseClient } from "./services/supabaseClient";
+import { processCareerEvents } from "./career-events";
 import "./App.css";
 
 const FUEL_CHEAT_FINE = 1000;
@@ -1828,18 +1829,13 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       return;
     }
 
-    await supabaseClient.from("career_diary").insert({
-      user_id: user.id,
-      flight_log_id: flightLogData?.id || null,
-      active_mission_id: activeMission.id,
-      event_type: "flight_completed",
-      title: "Voo concluído",
-      description: `${activeMission.origin} → ${activeMission.destination} com ${activeMission.aircraft}. Nota ${evaluation.pilotRating}/10 e pouso ${evaluation.landingGrade}.`,
-      origin: activeMission.origin,
-      destination: activeMission.destination,
-      aircraft: activeMission.aircraft,
+    await processCareerEvents({
+      userId: user.id,
+      activeMission,
+      evaluation,
+      flightLogId: flightLogData?.id || null,
     });    
-
+  
     const { data: wallet } = await supabaseClient
       .from("wallets")
       .select("balance")
