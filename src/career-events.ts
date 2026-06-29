@@ -1,4 +1,7 @@
 import { supabaseClient } from "./services/supabaseClient";
+import { processAchievements } from "./achievement-engine";
+
+type Rarity = "common" | "rare" | "epic" | "legendary";
 
 async function addCareerEntry({
   userId,
@@ -18,7 +21,7 @@ async function addCareerEntry({
   activeMissionId?: string | null;
   eventType: string;
   icon: string;
-  rarity: "common" | "rare" | "epic" | "legendary";
+  rarity: Rarity;
   title: string;
   description: string;
   origin?: string;
@@ -39,6 +42,7 @@ async function addCareerEntry({
     aircraft,
   });
 }
+
 async function hasCareerEvent(userId: string, eventType: string) {
   const { data } = await supabaseClient
     .from("career_diary")
@@ -129,60 +133,63 @@ export async function processCareerEvents({
       destination: activeMission.destination,
       aircraft: activeMission.aircraft,
     });
-const { data: airportData } = await supabaseClient
-  .from("airports")
-  .select("state")
-  .eq("sim_code", activeMission.destination)
-  .maybeSingle();
 
-const destinationState = airportData?.state || null;
+    const { data: airportData } = await supabaseClient
+      .from("airports")
+      .select("state")
+      .eq("sim_code", activeMission.destination)
+      .maybeSingle();
 
-if (destinationState) {
-  const { data: collectionData } = await supabaseClient.rpc(
-    "get_airport_collections_by_state",
-    {
-      p_user_id: userId,
+    const destinationState = airportData?.state || null;
+
+    if (destinationState) {
+      const { data: collectionData } = await supabaseClient.rpc(
+        "get_airport_collections_by_state",
+        {
+          p_user_id: userId,
+        }
+      );
+
+      const currentCollection = (collectionData || []).find(
+        (item: any) => item.state === destinationState
+      );
+
+      if (
+        currentCollection &&
+        Number(currentCollection.progress_percent || 0) >= 100
+      ) {
+        const reward = getCollectionReward(destinationState);
+
+        await supabaseClient.rpc("unlock_collection_title", {
+          p_user_id: userId,
+          p_state: destinationState,
+          p_title: reward.title,
+          p_icon: reward.badge,
+        });
+
+        await addCareerEntry({
+          userId,
+          flightLogId,
+          activeMissionId: activeMission.id,
+          eventType: "state_collection_completed",
+          icon: reward.badge,
+          rarity: "legendary",
+          title: reward.title,
+          description: `Você completou a coleção de ${destinationState}. Todos os aeroportos cadastrados desse estado agora fazem parte da sua história no NORTH OPS.`,
+          origin: activeMission.origin,
+          destination: activeMission.destination,
+          aircraft: activeMission.aircraft,
+        });
+      }
     }
-  );
-
-  const currentCollection = (collectionData || []).find(
-    (item: any) => item.state === destinationState
-  );
-
-  if (currentCollection && Number(currentCollection.progress_percent || 0) >= 100) {
-    const reward = getCollectionReward(destinationState);
-
-    await supabaseClient.rpc("unlock_collection_title", {
-      p_user_id: userId,
-      p_state: destinationState,
-      p_title: reward.title,
-      p_icon: reward.badge,
-    });
-
-    await addCareerEntry({
-      userId,
-      flightLogId,
-      activeMissionId: activeMission.id,
-      eventType: "state_collection_completed",
-      icon: reward.badge,
-      rarity: "legendary",
-      title: reward.title,
-      description: `Você completou a coleção de ${destinationState}. Todos os aeroportos cadastrados desse estado agora fazem parte da sua história no NORTH OPS.`,
-      origin: activeMission.origin,
-      destination: activeMission.destination,
-      aircraft: activeMission.aircraft,
-    });
   }
-}
+
   const alreadyHasExcellentLanding = await hasCareerEvent(
     userId,
     "first_excellent_landing"
   );
 
-  if (
-    !alreadyHasExcellentLanding &&
-    evaluation.landingGrade === "Excelente"
-  ) {
+  if (!alreadyHasExcellentLanding && evaluation.landingGrade === "Excelente") {
     await addCareerEntry({
       userId,
       flightLogId,
@@ -198,70 +205,72 @@ if (destinationState) {
       aircraft: activeMission.aircraft,
     });
   }
-const alreadyHasBeginnerExplorer = await hasCareerEvent(
-  userId,
-  "beginner_explorer"
-);
 
-const { count: visitedAirportsCount } = await supabaseClient
-  .from("visited_airports")
-  .select("*", {
-    count: "exact",
-    head: true,
-  })
-  .eq("user_id", userId);
-
-if (
-  !alreadyHasBeginnerExplorer &&
-  Number(visitedAirportsCount || 0) >= 5
-) {
-  await addCareerEntry({
+  const alreadyHasBeginnerExplorer = await hasCareerEvent(
     userId,
-    flightLogId,
-    activeMissionId: activeMission.id,
-    eventType: "beginner_explorer",
-    icon: "🗺️",
-    rarity: "rare",
-    title: "Explorador iniciante",
-    description:
-      "Você já conheceu 5 aeroportos diferentes na Região Norte. Sua jornada está apenas começando.",
-    origin: activeMission.origin,
-    destination: activeMission.destination,
-    aircraft: activeMission.aircraft,
-  });
-}
-const currentDistance = Number(activeMission.distance_nm || 0);
+    "beginner_explorer"
+  );
 
-const { data: previousLongerFlight } = await supabaseClient
-  .from("flight_logs")
-  .select("id")
-  .eq("user_id", userId)
-  .gt("distance_nm", currentDistance)
-  .neq("id", flightLogId || "")
-  .limit(1)
-  .maybeSingle();
+  const { count: visitedAirportsCount } = await supabaseClient
+    .from("visited_airports")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("user_id", userId);
 
-if (
-  currentDistance > 0 &&
-  !previousLongerFlight &&
-  currentDistance >= 80
-) {
-  await addCareerEntry({
-    userId,
-    flightLogId,
-    activeMissionId: activeMission.id,
-    eventType: "longest_flight_record",
-    icon: "📏",
-    rarity: "rare",
-    title: "Novo recorde de distância",
-    description: `Este foi o voo mais longo da sua carreira até agora: ${Math.round(
-      currentDistance
-    )} NM.`,
-    origin: activeMission.origin,
-    destination: activeMission.destination,
-    aircraft: activeMission.aircraft,
-  });
-}
-
+  if (
+    !alreadyHasBeginnerExplorer &&
+    Number(visitedAirportsCount || 0) >= 5
+  ) {
+    await addCareerEntry({
+      userId,
+      flightLogId,
+      activeMissionId: activeMission.id,
+      eventType: "beginner_explorer",
+      icon: "🗺️",
+      rarity: "rare",
+      title: "Explorador iniciante",
+      description:
+        "Você já conheceu 5 aeroportos diferentes na Região Norte. Sua jornada está apenas começando.",
+      origin: activeMission.origin,
+      destination: activeMission.destination,
+      aircraft: activeMission.aircraft,
+    });
   }
+
+  const currentDistance = Number(activeMission.distance_nm || 0);
+
+  const { data: previousLongerFlight } = await supabaseClient
+    .from("flight_logs")
+    .select("id")
+    .eq("user_id", userId)
+    .gt("distance_nm", currentDistance)
+    .neq("id", flightLogId || "")
+    .limit(1)
+    .maybeSingle();
+
+  if (currentDistance > 0 && !previousLongerFlight && currentDistance >= 80) {
+    await addCareerEntry({
+      userId,
+      flightLogId,
+      activeMissionId: activeMission.id,
+      eventType: "longest_flight_record",
+      icon: "📏",
+      rarity: "rare",
+      title: "Novo recorde de distância",
+      description: `Este foi o voo mais longo da sua carreira até agora: ${Math.round(
+        currentDistance
+      )} NM.`,
+      origin: activeMission.origin,
+      destination: activeMission.destination,
+      aircraft: activeMission.aircraft,
+    });
+  }
+
+  await processAchievements({
+    userId,
+    activeMission,
+    evaluation,
+  });
 }
