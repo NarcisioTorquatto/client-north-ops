@@ -1,5 +1,12 @@
 import { supabaseClient } from "./services/supabaseClient";
 
+type UnlockedAchievement = {
+  code: string;
+  title: string;
+  icon: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+};
+
 async function unlockAchievement({
   userId,
   code,
@@ -8,7 +15,15 @@ async function unlockAchievement({
   userId: string;
   code: string;
   progress?: number;
-}) {
+}): Promise<UnlockedAchievement | null> {
+  const { data: achievement } = await supabaseClient
+    .from("achievement_catalog")
+    .select("code, title, icon, rarity")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (!achievement) return null;
+
   const { data, error } = await supabaseClient.rpc("unlock_achievement", {
     p_user_id: userId,
     p_achievement_code: code,
@@ -17,10 +32,17 @@ async function unlockAchievement({
 
   if (error) {
     console.error("Erro ao desbloquear medalha:", code, error.message);
-    return false;
+    return null;
   }
 
-  return Boolean(data);
+  if (!data) return null;
+
+  return {
+    code: achievement.code,
+    title: achievement.title,
+    icon: achievement.icon || "🏅",
+    rarity: achievement.rarity || "common",
+  };
 }
 
 export async function processAchievements({
@@ -32,7 +54,7 @@ export async function processAchievements({
   activeMission: any;
   evaluation: any;
 }) {
-  const unlocked: string[] = [];
+  const unlocked: UnlockedAchievement[] = [];
 
   const { count: totalFlights } = await supabaseClient
     .from("flight_logs")
@@ -43,43 +65,43 @@ export async function processAchievements({
     .eq("user_id", userId);
 
   if (Number(totalFlights || 0) >= 1) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "first_flight",
       progress: Number(totalFlights || 0),
     });
 
-    if (ok) unlocked.push("first_flight");
+    if (achievement) unlocked.push(achievement);
   }
 
   if (Number(totalFlights || 0) >= 10) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "ten_flights",
       progress: Number(totalFlights || 0),
     });
 
-    if (ok) unlocked.push("ten_flights");
+    if (achievement) unlocked.push(achievement);
   }
 
   if (Number(totalFlights || 0) >= 50) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "fifty_flights",
       progress: Number(totalFlights || 0),
     });
 
-    if (ok) unlocked.push("fifty_flights");
+    if (achievement) unlocked.push(achievement);
   }
 
   if (evaluation?.landingGrade === "Excelente") {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "first_excellent_landing",
       progress: 1,
     });
 
-    if (ok) unlocked.push("first_excellent_landing");
+    if (achievement) unlocked.push(achievement);
   }
 
   const { count: excellentLandings } = await supabaseClient
@@ -92,13 +114,13 @@ export async function processAchievements({
     .eq("landing_grade", "Excelente");
 
   if (Number(excellentLandings || 0) >= 10) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "ten_excellent_landings",
       progress: Number(excellentLandings || 0),
     });
 
-    if (ok) unlocked.push("ten_excellent_landings");
+    if (achievement) unlocked.push(achievement);
   }
 
   const { count: visitedAirports } = await supabaseClient
@@ -110,33 +132,33 @@ export async function processAchievements({
     .eq("user_id", userId);
 
   if (Number(visitedAirports || 0) >= 1) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "first_airport_discovered",
       progress: Number(visitedAirports || 0),
     });
 
-    if (ok) unlocked.push("first_airport_discovered");
+    if (achievement) unlocked.push(achievement);
   }
 
   if (Number(visitedAirports || 0) >= 5) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "five_airports_discovered",
       progress: Number(visitedAirports || 0),
     });
 
-    if (ok) unlocked.push("five_airports_discovered");
+    if (achievement) unlocked.push(achievement);
   }
 
   if (Number(activeMission?.distance_nm || 0) >= 80) {
-    const ok = await unlockAchievement({
+    const achievement = await unlockAchievement({
       userId,
       code: "longest_flight_record",
       progress: Number(activeMission.distance_nm || 0),
     });
 
-    if (ok) unlocked.push("longest_flight_record");
+    if (achievement) unlocked.push(achievement);
   }
 
   return unlocked;

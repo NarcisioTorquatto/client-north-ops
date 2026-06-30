@@ -1,5 +1,6 @@
 import { supabaseClient } from "./services/supabaseClient";
 import { processAchievements } from "./achievement-engine";
+import { processDailyObjectives } from "./objective-engine";
 
 type Rarity = "common" | "rare" | "epic" | "legendary";
 
@@ -95,6 +96,8 @@ export async function processCareerEvents({
   evaluation: any;
   flightLogId?: string | null;
 }) {
+  let discoveredNewAirport = false;
+
   await addCareerEntry({
     userId,
     flightLogId,
@@ -120,6 +123,8 @@ export async function processCareerEvents({
       .single();
 
   if (!visitedAirportError && visitedAirport) {
+    discoveredNewAirport = true;
+
     await addCareerEntry({
       userId,
       flightLogId,
@@ -165,6 +170,8 @@ export async function processCareerEvents({
           p_state: destinationState,
           p_title: reward.title,
           p_icon: reward.badge,
+          p_xp_reward: reward.xp,
+          p_noc_reward: reward.noc,
         });
 
         await addCareerEntry({
@@ -268,9 +275,48 @@ export async function processCareerEvents({
     });
   }
 
-  await processAchievements({
+  const unlockedAchievements = await processAchievements({
     userId,
     activeMission,
     evaluation,
   });
+
+  for (const achievement of unlockedAchievements) {
+    await addCareerEntry({
+      userId,
+      flightLogId,
+      activeMissionId: activeMission.id,
+      eventType: "achievement_unlocked",
+      icon: achievement.icon,
+      rarity: achievement.rarity,
+      title: "Medalha conquistada",
+      description: `Você desbloqueou a medalha "${achievement.title}".`,
+      origin: activeMission.origin,
+      destination: activeMission.destination,
+      aircraft: activeMission.aircraft,
+    });
+  }
+
+  const completedObjectives = await processDailyObjectives({
+    userId,
+    activeMission,
+    evaluation,
+    discoveredNewAirport,
+  });
+
+  for (const objective of completedObjectives) {
+    await addCareerEntry({
+      userId,
+      flightLogId,
+      activeMissionId: activeMission.id,
+      eventType: "daily_objective_completed",
+      icon: objective.icon || "🎯",
+      rarity: "rare",
+      title: "Objetivo diário concluído",
+      description: `Você concluiu o objetivo "${objective.title}" e recebeu sua recompensa.`,
+      origin: activeMission.origin,
+      destination: activeMission.destination,
+      aircraft: activeMission.aircraft,
+    });
+  }
 }
