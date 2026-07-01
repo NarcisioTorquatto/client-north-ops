@@ -2158,6 +2158,7 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       <header className="app-header">
         <h1>Cliente North Ops</h1>
       </header>
+      
 
       {!user && (
         <section className="login-card">

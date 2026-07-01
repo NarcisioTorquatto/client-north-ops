@@ -1164,3 +1164,204 @@ button.danger {
 .update-error .update-progress-fill {
   background: linear-gradient(90deg, #991b1b, #ef4444);
 }
+/* NORTH OPS — ACTION BUTTON COLORS */
+
+/* Botões principais dentro da missão */
+.actions button {
+  min-height: 42px;
+}
+
+/* Primeiro botão: Atualizar */
+.actions button:nth-child(1) {
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  color: #eff6ff;
+  box-shadow:
+    0 4px 0 rgba(30, 64, 175, 0.95),
+    0 10px 20px rgba(37, 99, 235, 0.16);
+}
+
+/* Segundo botão: Voar agora */
+.actions button:nth-child(2) {
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  color: #03130a;
+}
+
+/* Terceiro botão: Finalizar voo */
+.actions button:nth-child(3) {
+  background: linear-gradient(180deg, #38ef7d, #16a34a);
+  color: #03130a;
+  box-shadow:
+    0 4px 0 rgba(21, 128, 61, 0.95),
+    0 10px 22px rgba(34, 197, 94, 0.2);
+}
+
+/* Quarto botão: Reiniciar/Cancelar */
+.actions button:nth-child(4) {
+  background: linear-gradient(180deg, #ef4444, #991b1b);
+  color: #fee2e2;
+  box-shadow:
+    0 4px 0 rgba(127, 29, 29, 0.95),
+    0 10px 20px rgba(239, 68, 68, 0.14);
+}
+
+/* Botões desativados continuam discretos */
+.actions button:disabled {
+  background: linear-gradient(180deg, #1e293b, #0f172a) !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+
+/* NORTH OPS — POLISH WITHOUT SIZE CHANGES */
+
+.mission-card,
+.flight-panel,
+.telemetry-strip,
+.no-mission-card,
+.login-card {
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
+  border-color: rgba(34, 197, 94, 0.14);
+}
+
+.mission-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.mission-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(34, 197, 94, 0.08), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.06), transparent 34%);
+}
+
+.mission-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tag {
+  border-color: rgba(34, 197, 94, 0.36);
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.08);
+}
+
+.mission-airports strong {
+  text-shadow: 0 0 18px rgba(34, 197, 94, 0.08);
+}
+
+.mission-quick-info div,
+.metric,
+.aircraft-summary-card,
+.status-message,
+.validation {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.92));
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.mission-quick-info div:hover,
+.metric:hover,
+.aircraft-summary-card:hover {
+  border-color: rgba(34, 197, 94, 0.24);
+}
+
+.validation.ok {
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.75);
+}
+
+.validation.error {
+  box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.75);
+}
+
+.status-message {
+  color: #cbd5e1;
+}
+
+.flight-progress-bar {
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+.fuel-bar,
+.flight-progress-bar {
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.fuel-fill,
+.flight-progress-fill {
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.22);
+}
+
+/* NORTH OPS — TELEMETRY POLISH WITHOUT SIZE CHANGES */
+
+.metric-header-line em {
+  color: #38ef7d;
+}
+
+.metric span,
+.aircraft-summary-card span {
+  letter-spacing: 0.08em;
+}
+
+.metric strong,
+.aircraft-summary-card strong {
+  text-shadow: 0 0 14px rgba(34, 197, 94, 0.08);
+}
+
+.progress-metric strong,
+.fuel-metric strong {
+  color: #38ef7d;
+}
+
+.passenger-metric strong,
+.cargo-metric strong {
+  color: #f8fafc;
+}
+
+.aircraft-summary-card {
+  border-left: 3px solid rgba(34, 197, 94, 0.65);
+}
+
+.progress-metric {
+  border-left: 3px solid rgba(96, 165, 250, 0.65);
+}
+
+.fuel-metric {
+  border-left: 3px solid rgba(34, 197, 94, 0.65);
+}
+
+.passenger-metric {
+  border-left: 3px solid rgba(251, 191, 36, 0.65);
+}
+
+.cargo-metric {
+  border-left: 3px solid rgba(168, 85, 247, 0.65);
+}
+/* NORTH OPS — NO MISSION POLISH */
+
+.no-mission-card {
+  background:
+    radial-gradient(circle at top, rgba(34, 197, 94, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.98));
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.no-mission-icon {
+  filter: drop-shadow(0 0 14px rgba(34, 197, 94, 0.22));
+}
+
+.no-mission-card h2 {
+  text-shadow: 0 0 16px rgba(34, 197, 94, 0.14);
+}
+
+.no-mission-card button {
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  color: #eff6ff;
+  box-shadow:
+    0 4px 0 rgba(30, 64, 175, 0.95),
+    0 10px 20px rgba(37, 99, 235, 0.18);
+}
