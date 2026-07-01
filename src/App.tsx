@@ -792,6 +792,7 @@ function App() {
   const touchdownFpmRef = useRef(0);
   const touchdownGForceRef = useRef(1);
   const touchdownSpeedRef = useRef(0);
+  const touchdownInvalidRef = useRef(false);
   const lastAirborneVerticalSpeedRef = useRef(0);
   const lastAirborneGForceRef = useRef(1);
   const lastAirborneAirspeedRef = useRef(0);
@@ -807,9 +808,12 @@ function App() {
   const maxPitchAngleRef = useRef(0);
   const maxDescentRateRef = useRef(0);
   const landingSpeedRef = useRef(0);
+
   const lastTelemetrySaveAtRef = useRef(0);
   const TELEMETRY_SAVE_INTERVAL_MS = 15000;
 
+  const lastLivePositionSaveAtRef = useRef(0);
+  const LIVE_POSITION_SAVE_INTERVAL_MS = 2000;
   const [validationStatus, setValidationStatus] = useState({
     ok: false,
     message: "Aguardando validação automática.",
@@ -1038,7 +1042,6 @@ async function handleUpdateButton() {
       validation_message: alert,
     });
   }
-
   useEffect(() => {
     if (!telemetryStarted || !activeMission || !user) return;
     if (activeMission.client_status !== "in_flight") return;
@@ -1171,7 +1174,7 @@ async function handleUpdateButton() {
         });
 
         landingSamplesRef.current = landingSamplesRef.current.filter(
-          (sample) => Date.now() - sample.time <= 5000
+          (sample) => Date.now() - sample.time <= 8000
         );
       }
 
@@ -1219,28 +1222,36 @@ async function handleUpdateButton() {
       lastTelemetrySaveAtRef.current = now;
     }
 
-    await supabaseClient
-      .from("live_positions")
-      .upsert(
-        {
-          user_id: user.id,
-          active_mission_id: activeMission.id,
-          latitude: payload.latitude,
-          longitude: payload.longitude,
-          altitude_ft: payload.altitude_ft,
-          ground_speed: payload.ground_speed,
-          heading: payload.heading,
-          fuel_percent: payload.fuel_percent,
-          aircraft: payload.aircraft,
-          sim_on_ground: payload.sim_on_ground,
-          engine_running: payload.engine_running,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id",
-        }
-      );
+    const shouldSaveLivePosition =
+      Number.isFinite(payload.latitude) &&
+      Number.isFinite(payload.longitude) &&
+      now - lastLivePositionSaveAtRef.current >= LIVE_POSITION_SAVE_INTERVAL_MS;
 
+    if (shouldSaveLivePosition) {
+      await supabaseClient
+        .from("live_positions")
+        .upsert(
+          {
+            user_id: user.id,
+            active_mission_id: activeMission.id,
+            latitude: payload.latitude,
+            longitude: payload.longitude,
+            altitude_ft: payload.altitude_ft,
+            ground_speed: payload.ground_speed,
+            heading: payload.heading,
+            fuel_percent: payload.fuel_percent,
+            aircraft: payload.aircraft,
+            sim_on_ground: payload.sim_on_ground,
+            engine_running: payload.engine_running,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      lastLivePositionSaveAtRef.current = now;
+    }
 
       
       if (!destinationAirport) return;
@@ -1252,20 +1263,36 @@ async function handleUpdateButton() {
     if (!wasOnGround && isNowOnGround && !touchdownCapturedRef.current) {
       const recentSamples = landingSamplesRef.current;
 
-      const touchdownFpm =
-        recentSamples.length > 0
-          ? Math.min(...recentSamples.map((sample) => sample.verticalSpeed))
-          : Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0);
+      const validLandingSamples = recentSamples.filter(
+        (sample) =>
+          Number.isFinite(sample.verticalSpeed) &&
+          Number.isFinite(sample.gForce) &&
+          Number.isFinite(sample.airspeed) &&
+          sample.verticalSpeed < 0 &&
+          sample.airspeed >= 35
+      );
 
-      const touchdownGForce =
-        recentSamples.length > 0
-          ? Math.max(...recentSamples.map((sample) => sample.gForce))
-          : Number(lastAirborneGForceRef.current || displayGForce || 1);
+      const touchdownSample =
+        validLandingSamples.length > 0
+          ? validLandingSamples.reduce((worstSample, sample) =>
+              sample.verticalSpeed < worstSample.verticalSpeed ? sample : worstSample
+            )
+          : null;
 
-      const touchdownSpeed =
-        recentSamples.length > 0
-          ? recentSamples[recentSamples.length - 1].airspeed
-          : Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+          
+
+      const touchdownFpm = touchdownSample
+        ? Number(touchdownSample.verticalSpeed)
+        : Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0);
+
+      const touchdownGForce = touchdownSample
+        ? Number(touchdownSample.gForce)
+        : Number(lastAirborneGForceRef.current || displayGForce || 1);
+
+      const touchdownSpeed = touchdownSample
+        ? Number(touchdownSample.airspeed)
+        : Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+
 
       if (
         !Number.isFinite(touchdownFpm) ||
@@ -1274,15 +1301,24 @@ async function handleUpdateButton() {
         touchdownFpm >= 0 ||
         touchdownSpeed < 35
       ) {
+        touchdownInvalidRef.current = true;
+        touchdownCapturedRef.current = false;
+
         addFlightEvent(flightEventsRef, {
           code: "invalid_touchdown_data",
           type: "warning",
-          title: "Toque não registrado corretamente",
-          message: "FPM/velocidade do toque não foram capturados corretamente. Este pouso não deve contar para ranking.",
+          title: "FPM inválido",
+          message:
+            "O pouso foi finalizado, mas o FPM/velocidade do toque não foram capturados corretamente. Este pouso não será salvo no ranking.",
           penalty: 0,
         });
+
+        setMessage(
+          "FPM inválido detectado. Você poderá finalizar o voo, mas este pouso não entrará no ranking."
+        );
       } else {
         touchdownCapturedRef.current = true;
+        touchdownInvalidRef.current = false;
         touchdownFpmRef.current = touchdownFpm;
         touchdownGForceRef.current = touchdownGForce;
         touchdownSpeedRef.current = touchdownSpeed;
@@ -1370,7 +1406,7 @@ async function handleUpdateButton() {
         setCanFinishFlight(false);
         setMessage(`Pouso fora do destino: ${distanceFromDestination.toFixed(1)} NM.`);
       }
-    }, 1000);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [telemetryStarted, activeMission, user, destinationAirport]);
@@ -1639,8 +1675,8 @@ async function handleUpdateButton() {
       lastAirborneAirspeedRef.current = 0;
       previousOnGroundRef.current = true;
       touchdownCapturedRef.current = false;
+      touchdownInvalidRef.current = false;
       landingSamplesRef.current = [];
-
       setCheatMessage("");
       setLastEvaluation(null);
     } catch (error: any) {
@@ -1803,20 +1839,22 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       max_pitch_angle: evaluation.maxPitchAngle,
       max_descent_rate: evaluation.maxDescentRate,
       landing_speed_kt: evaluation.landingSpeed,
-      touchdown_fpm: evaluation.touchdownFpm,
-      touchdown_g_force: evaluation.touchdownGForce,
-      touchdown_speed_kt: evaluation.touchdownSpeed,
-      landing_grade: evaluation.landingGrade,
-      landing_score: Math.max(
-        0,
-        Math.min(
-          100,
-          100 -
-            Math.abs(Number(evaluation.touchdownFpm || 0)) * 0.08 -
-            Math.max(0, Number(evaluation.touchdownGForce || 1) - 1) * 25
-        )
-      ),
-
+      touchdown_fpm: touchdownCapturedRef.current ? evaluation.touchdownFpm : null,
+      touchdown_g_force: touchdownCapturedRef.current ? evaluation.touchdownGForce : null,
+      touchdown_speed_kt: touchdownCapturedRef.current ? evaluation.touchdownSpeed : null,
+      landing_grade: touchdownCapturedRef.current ? evaluation.landingGrade : null,
+      
+      landing_score: touchdownCapturedRef.current
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              100 -
+                Math.abs(Number(evaluation.touchdownFpm || 0)) * 0.08 -
+                Math.max(0, Number(evaluation.touchdownGForce || 1) - 1) * 25
+            )
+          )
+        : null,
 
   })
   .select("id")
@@ -2009,8 +2047,9 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
     lastAirborneAirspeedRef.current = 0;
     previousOnGroundRef.current = true;
     touchdownCapturedRef.current = false;
-    landingSamplesRef.current = [];
-    lastTelemetrySaveAtRef.current = 0;
+    touchdownInvalidRef.current = false;
+    landingSamplesRef.current = [];    
+    lastLivePositionSaveAtRef.current = 0;
 
 
     await loadActiveMission(user.id);
@@ -2068,7 +2107,8 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
     completingFlightRef.current = false;
     fuelAtStartRef.current = null;
     cheatDetectedRef.current = false;
-  lastTelemetrySaveAtRef.current = 0;
+    lastTelemetrySaveAtRef.current = 0;
+    lastLivePositionSaveAtRef.current = 0;
 
 
     flightEventsRef.current = [];
@@ -2085,8 +2125,8 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
     lastAirborneAirspeedRef.current = 0;
     previousOnGroundRef.current = true;
     touchdownCapturedRef.current = false;
+    touchdownInvalidRef.current = false;
     landingSamplesRef.current = [];
-
     setActiveMission({
       ...activeMission,
       status: "active",
@@ -2181,23 +2221,74 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
           {compactMode ? "Modo normal" : "Modo compacto"}
         </button>
 
-      <div className="update-control">
+        <div className={`update-control update-${updateState}`}>
+          <button
+            className="update-button-secondary"
+            onClick={handleUpdateButton}
+            disabled={updateState === "checking" || updateState === "downloading"}
+          >
+            {updateState === "checking" && "Verificando..."}
+            {updateState === "available" && "Baixar atualização"}
+            {updateState === "downloading" && `Baixando ${Math.round(updatePercent)}%`}
+            {updateState === "downloaded" && "Reiniciar e instalar"}
+            {(updateState === "idle" || updateState === "none") && "Verificar atualização"}
+            {updateState === "error" && "Tentar novamente"}
+          </button>
 
-        <button
-          className="update-button-secondary"
-          onClick={handleUpdateButton}
-          disabled={updateState === "checking" || updateState === "downloading"}
-        >
-          {updateState === "checking" && "Verificando..."}
-          {updateState === "available" && "Atualizar agora"}
-          {updateState === "downloading" && `Baixando ${updatePercent}%`}
-          {updateState === "downloaded" && "Reiniciar e instalar"}
-          {(updateState === "idle" || updateState === "none" || updateState === "error") &&
-            "Verificar atualização"}
-        </button>
-        
-               
-      </div>
+          {(updateState === "checking" ||
+            updateState === "available" ||
+            updateState === "downloading" ||
+            updateState === "downloaded" ||
+            updateState === "error") && (
+            <div className="update-status-panel">
+              <div className="update-status-top">
+                <strong>
+                  {updateState === "checking" && "Procurando atualizações"}
+                  {updateState === "available" && "Nova versão disponível"}
+                  {updateState === "downloading" && "Atualizando NORTH OPS"}
+                  {updateState === "downloaded" && "Atualização pronta"}
+                  {updateState === "error" && "Falha na atualização"}
+                </strong>
+
+                <span>
+                  {updateState === "downloading"
+                    ? `${Math.round(updatePercent)}%`
+                    : updateState === "downloaded"
+                    ? "100%"
+                    : ""}
+                </span>
+              </div>
+
+              <div className="update-progress-track">
+                <div
+                  className="update-progress-fill"
+                  style={{
+                    width:
+                      updateState === "checking"
+                        ? "35%"
+                        : updateState === "available"
+                        ? "15%"
+                        : updateState === "downloaded"
+                        ? "100%"
+                        : updateState === "error"
+                        ? "100%"
+                        : `${Math.max(0, Math.min(100, updatePercent))}%`,
+                  }}
+                />
+              </div>
+
+              <p>
+                {updateState === "checking" && "Verificando a versão instalada..."}
+                {updateState === "available" && "Atualização obrigatória encontrada."}
+                {updateState === "downloading" && "Baixando arquivos do cliente..."}
+                {updateState === "downloaded" && "Reinicie para aplicar a nova versão."}
+                {updateState === "error" && "Não foi possível verificar ou baixar a atualização."}
+              </p>
+            </div>
+          )}
+        </div>
+
+
       </div>
       )}
 
