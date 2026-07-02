@@ -735,23 +735,23 @@ function normalizeHeading(value: any) {
     const g = Number(gForce || 1);
 
     if (absFpm <= 120 && g <= 1.25) return "Excelente";
-    if (absFpm <= 200 && g <= 1.4) return "Muito bom";
-    if (absFpm <= 300 && g <= 1.6) return "Bom";
-    if (absFpm <= 450 && g <= 1.8) return "Firme";
-    if (absFpm <= 650 && g <= 2.1) return "Duro";
+    if (absFpm <= 220 && g <= 1.4) return "Muito bom";
+    if (absFpm <= 330 && g <= 1.6) return "Bom";
+    if (absFpm <= 500 && g <= 1.85) return "Firme";
+    if (absFpm <= 700 && g <= 2.15) return "Duro";
     return "Muito duro";
+    
   }
 
   function getLandingImpactLevel(fpm: number, gForce: number) {
     const absFpm = Math.abs(Number(fpm || 0));
     const g = Number(gForce || 1);
 
-    if (absFpm > 650 || g > 2.1) return "hard";
-    if (absFpm > 450 || g > 1.8) return "firm";
+    if (absFpm > 700 || g > 2.15) return "hard";
+    if (absFpm > 500 || g > 1.85) return "firm";
     return "normal";
+
   }
-
-
 
 function App() {
   const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
@@ -792,6 +792,7 @@ function App() {
   const touchdownFpmRef = useRef(0);
   const touchdownGForceRef = useRef(1);
   const touchdownSpeedRef = useRef(0);
+  
   const touchdownInvalidRef = useRef(false);
   const lastAirborneVerticalSpeedRef = useRef(0);
   const lastAirborneGForceRef = useRef(1);
@@ -800,8 +801,6 @@ function App() {
   const landingSamplesRef = useRef<
     { time: number; verticalSpeed: number; gForce: number; airspeed: number }[]
   >([]);
-
-
   const flightEventsRef = useRef<any[]>([]);
   const maxGForceRef = useRef(1);
   const maxBankAngleRef = useRef(0);
@@ -1272,14 +1271,42 @@ async function handleUpdateButton() {
           sample.airspeed >= 35
       );
 
-      const touchdownSample =
-        validLandingSamples.length > 0
-          ? validLandingSamples.reduce((worstSample, sample) =>
-              sample.verticalSpeed < worstSample.verticalSpeed ? sample : worstSample
-            )
-          : null;
+      const touchdownWindowMs = 900;
 
-          
+      const touchdownWindowSamples = validLandingSamples.filter(
+        (sample) => Date.now() - sample.time <= touchdownWindowMs
+      );
+
+      const samplesForTouchdown =
+        touchdownWindowSamples.length > 0 ? touchdownWindowSamples : validLandingSamples;
+
+      const sortedByTouchdownMoment = [...samplesForTouchdown].sort(
+        (a, b) => b.time - a.time
+      );
+
+      const closestTouchdownSamples = sortedByTouchdownMoment.slice(0, 3);
+
+      const touchdownSample =
+        closestTouchdownSamples.length > 0
+          ? {
+              time: closestTouchdownSamples[0].time,
+              verticalSpeed:
+                closestTouchdownSamples.reduce(
+                  (sum, sample) => sum + sample.verticalSpeed,
+                  0
+                ) / closestTouchdownSamples.length,
+              gForce:
+                closestTouchdownSamples.reduce(
+                  (sum, sample) => sum + sample.gForce,
+                  0
+                ) / closestTouchdownSamples.length,
+              airspeed:
+                closestTouchdownSamples.reduce(
+                  (sum, sample) => sum + sample.airspeed,
+                  0
+                ) / closestTouchdownSamples.length,
+            }
+          : null;
 
       const touchdownFpm = touchdownSample
         ? Number(touchdownSample.verticalSpeed)
@@ -1292,6 +1319,8 @@ async function handleUpdateButton() {
       const touchdownSpeed = touchdownSample
         ? Number(touchdownSample.airspeed)
         : Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
+        
+        landingSpeedRef.current = touchdownSpeed;
 
 
       if (
@@ -1321,7 +1350,7 @@ async function handleUpdateButton() {
         touchdownInvalidRef.current = false;
         touchdownFpmRef.current = touchdownFpm;
         touchdownGForceRef.current = touchdownGForce;
-        touchdownSpeedRef.current = touchdownSpeed;
+        touchdownSpeedRef.current = touchdownSpeed;        
       }
 
 
