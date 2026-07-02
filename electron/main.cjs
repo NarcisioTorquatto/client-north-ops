@@ -140,7 +140,7 @@ function setupUpdater() {
 
   autoUpdater.on("update-available", (info) => {
     sendToRenderer("update-status", {
-      status: "downloading",
+      status: "available",
       version: info.version,
       percent: 0,
       message: `Nova versão encontrada: v${info.version}. Baixando automaticamente...`,
@@ -206,18 +206,11 @@ ipcMain.handle("check-for-updates", async () => {
   }
 
   try {
-    const result = await autoUpdater.checkForUpdates();
-
-    if (!result?.updateInfo?.version) {
-      return {
-        status: "none",
-        message: "Você já está na versão mais recente.",
-      };
-    }
+    await autoUpdater.checkForUpdates();
 
     return {
-      status: "available",
-      message: `Atualização disponível: v${result.updateInfo.version}`,
+      status: "checking",
+      message: "Verificando atualizações...",
     };
   } catch {
     return {
@@ -227,8 +220,15 @@ ipcMain.handle("check-for-updates", async () => {
   }
 });
 
+
 ipcMain.handle("download-update", async () => {
-  return await autoUpdater.downloadUpdate();
+  await autoUpdater.downloadUpdate();
+
+  return {
+  status: "downloading",
+  };
+
+  
 });
 
 ipcMain.handle("install-update", () => {
