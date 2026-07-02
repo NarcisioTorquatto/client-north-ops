@@ -170,11 +170,15 @@ function setupUpdater() {
   });
 
   autoUpdater.on("error", (error) => {
+    console.error(error);
+
     sendToRenderer("update-status", {
       status: "error",
       message: `Erro na atualização: ${error.message}`,
     });
   });
+
+
 }
 
 ipcMain.handle("get-app-version", () => {
@@ -273,7 +277,10 @@ app.whenReady().then(() => {
   createWindow();
   startSimBridge();
   setupUpdater();
+
+  autoUpdater.logger = console;
 });
+
 
 app.on("window-all-closed", () => {
   if (pythonProcess) pythonProcess.kill();
