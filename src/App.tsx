@@ -1347,69 +1347,48 @@ async function handleUpdateButton() {
           Number.isFinite(sample.verticalSpeed) &&
           Number.isFinite(sample.gForce) &&
           Number.isFinite(sample.airspeed) &&
-          sample.verticalSpeed < 0 &&
           sample.airspeed >= 35
       );
 
-      const touchdownWindowMs = 900;
-
-      const touchdownWindowSamples = validLandingSamples.filter(
-        (sample) => Date.now() - sample.time <= touchdownWindowMs
+      const descendingSamples = validLandingSamples.filter(
+        (sample) => sample.verticalSpeed < -20
       );
-
-      const samplesForTouchdown =
-        touchdownWindowSamples.length > 0 ? touchdownWindowSamples : validLandingSamples;
-
-      const sortedByTouchdownMoment = [...samplesForTouchdown].sort(
-        (a, b) => b.time - a.time
-      );
-
-      const closestTouchdownSamples = sortedByTouchdownMoment.slice(0, 3);
 
       const touchdownSample =
-        closestTouchdownSamples.length > 0
-          ? {
-              time: closestTouchdownSamples[0].time,
-              verticalSpeed:
-                closestTouchdownSamples.reduce(
-                  (sum, sample) => sum + sample.verticalSpeed,
-                  0
-                ) / closestTouchdownSamples.length,
-              gForce:
-                closestTouchdownSamples.reduce(
-                  (sum, sample) => sum + sample.gForce,
-                  0
-                ) / closestTouchdownSamples.length,
-              airspeed:
-                closestTouchdownSamples.reduce(
-                  (sum, sample) => sum + sample.airspeed,
-                  0
-                ) / closestTouchdownSamples.length,
-            }
+        descendingSamples.length > 0
+          ? [...descendingSamples].sort(
+              (a, b) => a.verticalSpeed - b.verticalSpeed
+            )[0]
           : null;
+
+      const fallbackFpm = Number(lastAirborneVerticalSpeedRef.current || 0);
+      const fallbackGForce = Number(lastAirborneGForceRef.current || displayGForce || 1);
+      const fallbackSpeed = Number(
+        lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0
+      );
 
       const touchdownFpm = touchdownSample
         ? Number(touchdownSample.verticalSpeed)
-        : Number(lastAirborneVerticalSpeedRef.current || verticalSpeed || 0);
+        : fallbackFpm;
 
       const touchdownGForce = touchdownSample
         ? Number(touchdownSample.gForce)
-        : Number(lastAirborneGForceRef.current || displayGForce || 1);
+        : fallbackGForce;
 
       const touchdownSpeed = touchdownSample
         ? Number(touchdownSample.airspeed)
-        : Number(lastAirborneAirspeedRef.current || airspeed || payload.ground_speed || 0);
-        
-        landingSpeedRef.current = touchdownSpeed;
+        : fallbackSpeed;
 
+      landingSpeedRef.current = touchdownSpeed;
 
-      if (
-        !Number.isFinite(touchdownFpm) ||
-        !Number.isFinite(touchdownGForce) ||
-        !Number.isFinite(touchdownSpeed) ||
-        touchdownFpm >= 0 ||
-        touchdownSpeed < 35
-      ) {
+      const validTouchdown =
+        Number.isFinite(touchdownFpm) &&
+        Number.isFinite(touchdownGForce) &&
+        Number.isFinite(touchdownSpeed) &&
+        touchdownFpm < -20 &&
+        touchdownSpeed >= 35;
+
+      if (!validTouchdown) {
         touchdownInvalidRef.current = true;
         touchdownCapturedRef.current = false;
 
@@ -1430,38 +1409,39 @@ async function handleUpdateButton() {
         touchdownInvalidRef.current = false;
         touchdownFpmRef.current = touchdownFpm;
         touchdownGForceRef.current = touchdownGForce;
-        touchdownSpeedRef.current = touchdownSpeed;        
-      }
+        touchdownSpeedRef.current = touchdownSpeed;
 
+        const landingGrade = getLandingGrade(touchdownFpm, touchdownGForce);
+        const impactLevel = getLandingImpactLevel(touchdownFpm, touchdownGForce);
 
-      const landingGrade = getLandingGrade(touchdownFpm, touchdownGForce);
-
-      if (getLandingImpactLevel(touchdownFpm, touchdownGForce) === "hard") {
-        addFlightEvent(flightEventsRef, {
-          code: "hard_landing",
-          type: "danger",
-          title: "Pouso duro",
-          message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
-          penalty: 3,
-        });
-      } else if (getLandingImpactLevel(touchdownFpm, touchdownGForce) === "firm") {
-        addFlightEvent(flightEventsRef, {
-          code: "firm_landing",
-          type: "warning",
-          title: "Pouso firme",
-          message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
-          penalty: 1,
-        });
-      } else {
-        addFlightEvent(flightEventsRef, {
-          code: "good_landing",
-          type: "positive",
-          title: "Pouso controlado",
-          message: `Toque ${landingGrade}: ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
-          penalty: 0,
-        });
+        if (impactLevel === "hard") {
+          addFlightEvent(flightEventsRef, {
+            code: "hard_landing",
+            type: "danger",
+            title: "Pouso duro",
+            message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
+            penalty: 3,
+          });
+        } else if (impactLevel === "firm") {
+          addFlightEvent(flightEventsRef, {
+            code: "firm_landing",
+            type: "warning",
+            title: "Pouso firme",
+            message: `Toque detectado com ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
+            penalty: 1,
+          });
+        } else {
+          addFlightEvent(flightEventsRef, {
+            code: "good_landing",
+            type: "positive",
+            title: "Pouso controlado",
+            message: `Toque ${landingGrade}: ${Math.round(touchdownFpm)} FPM e ${touchdownGForce.toFixed(2)}G.`,
+            penalty: 0,
+          });
+        }
       }
     }
+
 
     previousOnGroundRef.current = isNowOnGround;
 
