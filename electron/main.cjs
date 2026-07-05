@@ -10,6 +10,12 @@ let mainWindow;
 let pythonProcess;
 const pendingCommands = new Map();
 
+let lastUpdateStatus = {
+  status: "idle",
+  message: "Pronto.",
+  percent: 0,
+};
+
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
@@ -19,13 +25,21 @@ function sendToRenderer(channel, data) {
   }
 }
 
+function setUpdateStatus(data) {
+  lastUpdateStatus = {
+    ...lastUpdateStatus,
+    ...data,
+  };
+
+  sendToRenderer("update-status", lastUpdateStatus);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 980,
     height: 740,
     minWidth: 900,
-    minHeight: 720,    
-    
+    minHeight: 720,
     backgroundColor: "#020817",
     icon: path.join(__dirname, "../resources/icon.ico"),
     webPreferences: {
@@ -129,70 +143,58 @@ function startSimBridge() {
     sendBridgeStatus(`Bridge encerrada: ${code}`);
   });
 }
-let lastUpdateStatus = {
-  status: "idle",
-  message: "Pronto.",
-  percent: 0,
-};
-
-function setUpdateStatus(data) {
-  lastUpdateStatus = {
-    ...lastUpdateStatus,
-    ...data,
-  };
-
-  sendToRenderer("update-status", lastUpdateStatus);
-}
 
 function setupUpdater() {
   autoUpdater.on("checking-for-update", () => {
     setUpdateStatus({
       status: "checking",
       message: "Verificando atualizações...",
+      percent: 0,
     });
   });
 
   autoUpdater.on("update-available", (info) => {
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "available",
       version: info.version,
       percent: 0,
-      message: `Nova versão encontrada: v${info.version}. Baixando automaticamente...`,
+      message: `Nova versão disponível: ${info.version}`,
     });
   });
 
   autoUpdater.on("update-not-available", () => {
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "none",
-      message: "Você já está na versão mais recente.",
+      message: "Cliente atualizado.",
+      percent: 0,
     });
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "downloading",
       percent: Math.round(progress.percent),
-      message: `Baixando atualização: ${Math.round(progress.percent)}%`,
+      message: `Baixando atualização (${Math.round(progress.percent)}%)`,
     });
   });
 
   autoUpdater.on("update-downloaded", () => {
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "downloaded",
+      percent: 100,
       message: "Atualização pronta para instalar.",
     });
   });
 
   autoUpdater.on("error", (error) => {
-    console.error(error);
+    console.error("Updater:", error);
 
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "error",
-      message: `Erro na atualização: ${error.message}`,
+      message: error.message,
+      percent: 0,
     });
   });
-
-
 }
 
 ipcMain.handle("get-app-version", () => {
@@ -217,35 +219,17 @@ ipcMain.handle("set-compact-mode", (_event, compact) => {
 
 ipcMain.handle("check-for-updates", async () => {
   if (isDev) {
-    return {
-      status: "none",
-      message: "",
-      percent: 0,
-    };
-  }
-
-  try {
     setUpdateStatus({
-      status: "checking",
-      message: "Verificando atualizações...",
+      status: "none",
+      message: "Modo desenvolvimento.",
       percent: 0,
     });
 
-    const result = await autoUpdater.checkForUpdates();
+    return lastUpdateStatus;
+  }
 
-    const currentVersion = app.getVersion();
-    const latestVersion = result?.updateInfo?.version;
-
-    if (!latestVersion || latestVersion === currentVersion) {
-      setUpdateStatus({
-        status: "none",
-        message: "Cliente atualizado.",
-        percent: 0,
-      });
-
-      return lastUpdateStatus;
-    }
-
+  try {
+    await autoUpdater.checkForUpdates();
     return lastUpdateStatus;
   } catch (error) {
     setUpdateStatus({
@@ -258,15 +242,19 @@ ipcMain.handle("check-for-updates", async () => {
   }
 });
 
-
 ipcMain.handle("download-update", async () => {
-  await autoUpdater.downloadUpdate();
+  try {
+    await autoUpdater.downloadUpdate();
+    return lastUpdateStatus;
+  } catch (error) {
+    setUpdateStatus({
+      status: "error",
+      message: `Erro ao baixar atualização: ${error.message}`,
+      percent: 0,
+    });
 
-  return {
-  status: "downloading",
-  };
-
-  
+    return lastUpdateStatus;
+  }
 });
 
 ipcMain.handle("install-update", () => {
@@ -313,6 +301,22 @@ app.whenReady().then(() => {
   createWindow();
   startSimBridge();
   setupUpdater();
+
+  if (!isDev) {
+    setTimeout(async () => {
+      try {
+        await autoUpdater.checkForUpdates();
+      } catch (error) {
+        console.error("Erro ao verificar atualização:", error);
+
+        setUpdateStatus({
+          status: "error",
+          message: `Erro ao verificar atualização: ${error.message}`,
+          percent: 0,
+        });
+      }
+    }, 2500);
+  }
 });
 
 app.on("window-all-closed", () => {
