@@ -158,6 +158,53 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "carenadostationair8ii",
       "carenadot207astationair8ii"
     ],
+  // Daher TBM 960
+  [
+    "dahertbm960",
+    "tbm960",
+    "dahertbm",
+    "tbm",
+    "socatatbm960",
+    "socatatbm",
+    "tbm930",
+    "asobotbm930",
+    "asobotbm",
+    "black-squaretbm",
+    "blacksquaretbm",
+    "bksqtbm",
+    "bksqtbm960",
+    "microsofttbm",
+    "msfstbm"
+  ],
+
+  // Mitsubishi MU-2
+  [
+    "mitsubishimu2",
+    "mitsubishimu2b",
+    "mitsubishimu2f",
+    "mitsubishimu2j",
+    "mitsubishimu2marquise",
+    "mu2",
+    "mu2b",
+    "mu2f",
+    "mu2j",
+    "marquise",
+
+    "blackbirdmu2",
+    "blackbirdsimulationsmu2",
+    "blackbirdsimulationsmitsubishimu2",
+
+    "turbinelegendsmu2",
+    "turbinelegendsmitsubishimu2",
+
+    "flysimwaremu2",
+    "flysimwaremitsubishimu2",
+
+    "msfsmu2",
+    "microsoftmu2",
+    "asobomu2"
+  ],
+
     [
       "piperpa28warriorii",
       "piperpa28161warriorii",
@@ -1901,12 +1948,6 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       return;
     }
 
-    await processCareerEvents({
-      userId: user.id,
-      activeMission,
-      evaluation,
-      flightLogId: flightLogData?.id || null,
-    });    
   
     const { data: wallet } = await supabaseClient
       .from("wallets")
@@ -2046,6 +2087,13 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
         evaluated_flights: currentFlights + 1,
       })
       .eq("id", user.id);
+      
+    await processCareerEvents({
+      userId: user.id,
+      activeMission,
+      evaluation,
+      flightLogId: flightLogData?.id || null,
+    });      
 
     setLastEvaluation({
       ...evaluation,

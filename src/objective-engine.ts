@@ -30,29 +30,28 @@ export async function processDailyObjectives({
   for (const objective of objectives) {
     let progressToAdd = 0;
 
-    if (objective.code === "daily_complete_flight") {
+    if (objective.code === "daily_complete_1_flight") {
       progressToAdd = 1;
     }
 
     if (
-      objective.code === "daily_excellent_landing" &&
-      evaluation?.landingGrade === "Excelente"
+      objective.code === "daily_good_landing" &&
+      ["Bom", "Muito bom", "Excelente"].includes(evaluation?.landingGrade)
     ) {
       progressToAdd = 1;
     }
 
     if (
-      objective.code === "daily_discover_airport" &&
+      objective.code === "daily_discover_1_airport" &&
       discoveredNewAirport
     ) {
       progressToAdd = 1;
     }
 
     if (
-      objective.code === "daily_long_flight" &&
-      Number(activeMission?.distance_nm || 0) >= Number(objective.target_value || 0)
+      objective.code === "daily_earn_10000_noc"
     ) {
-      progressToAdd = Number(activeMission?.distance_nm || 0);
+      progressToAdd = Number(activeMission?.payment || 0);
     }
 
     if (progressToAdd <= 0) continue;
@@ -72,7 +71,7 @@ export async function processDailyObjectives({
     const completed = newProgress >= target;
 
     if (existing) {
-      await supabaseClient
+      const { error } = await supabaseClient
         .from("pilot_objectives")
         .update({
           progress: newProgress,
@@ -80,16 +79,23 @@ export async function processDailyObjectives({
           completed_at: completed ? new Date().toISOString() : null,
         })
         .eq("id", existing.id);
+
+      if (error) {
+        console.error("ERRO AO ATUALIZAR OBJETIVO:", error);
+      }
     } else {
-      await supabaseClient.from("pilot_objectives").insert({
+      const { error } = await supabaseClient.from("pilot_objectives").insert({
         user_id: userId,
         objective_code: objective.code,
-        period: objective.period,
         period_key: todayKey,
         progress: newProgress,
         completed,
         completed_at: completed ? new Date().toISOString() : null,
       });
+
+      if (error) {
+        console.error("ERRO AO INSERIR OBJETIVO:", error);
+      }
     }
 
     if (completed) {
