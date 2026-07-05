@@ -974,6 +974,11 @@ async function handleUpdateButton() {
       setUpdateState(result.status);
       return;
     }
+    
+    if (result?.message) {
+        setMessage(result.message);
+    }
+
 
     setUpdateState("none");
   } catch {

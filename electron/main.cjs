@@ -129,10 +129,24 @@ function startSimBridge() {
     sendBridgeStatus(`Bridge encerrada: ${code}`);
   });
 }
+let lastUpdateStatus = {
+  status: "idle",
+  message: "Pronto.",
+  percent: 0,
+};
+
+function setUpdateStatus(data) {
+  lastUpdateStatus = {
+    ...lastUpdateStatus,
+    ...data,
+  };
+
+  sendToRenderer("update-status", lastUpdateStatus);
+}
 
 function setupUpdater() {
   autoUpdater.on("checking-for-update", () => {
-    sendToRenderer("update-status", {
+    setUpdateStatus({
       status: "checking",
       message: "Verificando atualizações...",
     });
@@ -206,21 +220,41 @@ ipcMain.handle("check-for-updates", async () => {
     return {
       status: "none",
       message: "",
+      percent: 0,
     };
   }
 
   try {
-    await autoUpdater.checkForUpdates();
-
-    return {
+    setUpdateStatus({
       status: "checking",
       message: "Verificando atualizações...",
-    };
-  } catch {
-    return {
+      percent: 0,
+    });
+
+    const result = await autoUpdater.checkForUpdates();
+
+    const currentVersion = app.getVersion();
+    const latestVersion = result?.updateInfo?.version;
+
+    if (!latestVersion || latestVersion === currentVersion) {
+      setUpdateStatus({
+        status: "none",
+        message: "Cliente atualizado.",
+        percent: 0,
+      });
+
+      return lastUpdateStatus;
+    }
+
+    return lastUpdateStatus;
+  } catch (error) {
+    setUpdateStatus({
       status: "error",
-      message: "Erro ao verificar atualização.",
-    };
+      message: `Erro ao verificar atualização: ${error.message}`,
+      percent: 0,
+    });
+
+    return lastUpdateStatus;
   }
 });
 
@@ -274,13 +308,12 @@ ipcMain.handle("apply-briefing-to-aircraft", async (_event, briefing) => {
 });
 
 app.whenReady().then(() => {
+  autoUpdater.logger = console;
+
   createWindow();
   startSimBridge();
   setupUpdater();
-
-  autoUpdater.logger = console;
 });
-
 
 app.on("window-all-closed", () => {
   if (pythonProcess) pythonProcess.kill();
