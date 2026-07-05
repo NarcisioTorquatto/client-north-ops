@@ -82,6 +82,34 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
       "asoboc172",
       "asobocessna172",
     ],
+    // Britten-Norman BN-2 Islander
+    [
+      "brittennormanbn2",
+      "brittennormanbn2a",
+      "brittennormanbn2b",
+      "brittennormanislander",
+      "bn2",
+      "bn2a",
+      "bn2b",
+      "bn2islander",
+      "islander",
+
+      "blackboxbn2",
+      "blackboxsimulationbn2",
+      "blackboxsimulationsbn2",
+      "blackboxbrittennormanbn2",
+      "blackboxbrittennormanislander",
+
+      "carenadobn2",
+      "carenadoislander",
+      "carenadobrittennormanbn2",
+
+      "msfsbn2",
+      "microsoftbn2",
+      "asobobn2",
+      "asoboislander"
+    ],
+
     [
       "cessna206",
       "cessnac206",
@@ -2087,7 +2115,7 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
         evaluated_flights: currentFlights + 1,
       })
       .eq("id", user.id);
-      
+
     await processCareerEvents({
       userId: user.id,
       activeMission,
