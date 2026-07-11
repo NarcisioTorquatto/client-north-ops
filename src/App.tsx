@@ -829,11 +829,16 @@ function normalizeHeading(value: any) {
   }
 
 function App() {
-  const [email, setEmail] = useState(() => localStorage.getItem("northops_email") || "");
-  const [password, setPassword] = useState(() => localStorage.getItem("northops_password") || "");
+  const [email, setEmail] = useState(
+    () => localStorage.getItem("northops_email") || ""
+  );
+
+  const [password, setPassword] = useState("");
+
   const [rememberLogin, setRememberLogin] = useState(
     () => localStorage.getItem("northops_remember_login") === "true"
   );
+  
 
   const [user, setUser] = useState<any>(null);
   const [activeMission, setActiveMission] = useState<any>(null);
@@ -1687,13 +1692,15 @@ async function handleUpdateButton() {
     }
 
     if (rememberLogin) {
-      localStorage.setItem("northops_email", email);
-      localStorage.setItem("northops_password", password);
-      localStorage.setItem("northops_remember_login", "true");
-    } else {
-      localStorage.removeItem("northops_email");
+      if (rememberLogin) {
+        localStorage.setItem("northops_email", email);
+        localStorage.setItem("northops_remember_login", "true");
+      } else {
+        localStorage.removeItem("northops_email");
+        localStorage.removeItem("northops_remember_login");
+      }
+
       localStorage.removeItem("northops_password");
-      localStorage.removeItem("northops_remember_login");
     }
 
     setMessage("Verificando atualizações do cliente...");
