@@ -111,6 +111,18 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
     ],
 
     [
+      "piperpa28dakota",
+      "piperpa28-236dakota",
+      "pa28-236dakota",
+      "pa-28-236dakota",
+      "piperpa28-236dakota",
+      "piperpa-28-236dakota",
+      "piperdakota",
+      "PA28-236",
+      "PA-28-236"
+    ],
+
+    [
       "cessna206",
       "cessnac206",
       "c206",
