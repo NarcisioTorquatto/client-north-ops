@@ -1,21 +1,58 @@
 import { supabaseClient } from "./services/supabaseClient";
 
-function getTodayKey() {
-  return new Date().toISOString().split("T")[0];
-}
+  function getTodayKey() {
+    const now = new Date();
 
-export async function processDailyObjectives({
-  userId,
-  activeMission,
-  evaluation,
-  discoveredNewAirport,
-}: {
-  userId: string;
-  activeMission: any;
-  evaluation: any;
-  discoveredNewAirport: boolean;
-}) {
-  const todayKey = getTodayKey();
+    const brasiliaDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+
+    return brasiliaDate;
+  }
+
+  export async function processDailyObjectives({
+    userId,
+    activeMission,
+    evaluation,
+    discoveredNewAirport,
+  }: {
+    userId: string;
+    activeMission: any;
+    evaluation: any;
+    discoveredNewAirport: boolean;
+  }) {
+    const todayKey = getTodayKey();
+  function seededRandom(seed: string) {
+    let hash = 2166136261;
+
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+
+    return () => {
+      hash += hash << 13;
+      hash ^= hash >>> 7;
+      hash += hash << 3;
+      hash ^= hash >>> 17;
+      hash += hash << 5;
+
+      return (hash >>> 0) / 4294967296;
+    };
+  }
+
+  function selectDailyObjectives(objectives: any[], todayKey: string) {
+    const random = seededRandom(`north-ops-${todayKey}`);
+
+    const shuffled = [...objectives].sort(() => random() - 0.5);
+
+    return shuffled.slice(0, 4);
+  }  
+
+
 
   const { data: objectives } = await supabaseClient
     .from("objective_catalog")
@@ -25,9 +62,12 @@ export async function processDailyObjectives({
 
   if (!objectives || objectives.length === 0) return [];
 
+  const dailyObjectives = selectDailyObjectives(objectives, todayKey);
+
   const completedObjectives: any[] = [];
 
-  for (const objective of objectives) {
+  for (const objective of dailyObjectives) {
+
     let progressToAdd = 0;
 
     if (objective.code === "daily_complete_1_flight") {

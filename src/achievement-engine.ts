@@ -84,6 +84,12 @@ export async function processAchievements({
     if (achievement) unlocked.push(achievement);
   }
 
+  await supabaseClient.rpc("update_achievement_progress", {
+    p_user_id: userId,
+    p_achievement_code: "fifty_flights",
+    p_progress: Number(totalFlights || 0),
+  });  
+
   if (Number(totalFlights || 0) >= 50) {
     const achievement = await unlockAchievement({
       userId,
@@ -112,6 +118,12 @@ export async function processAchievements({
     })
     .eq("user_id", userId)
     .eq("landing_grade", "Excelente");
+
+  await supabaseClient.rpc("update_achievement_progress", {
+    p_user_id: userId,
+    p_achievement_code: "ten_excellent_landings",
+    p_progress: Number(excellentLandings || 0),
+  });
 
   if (Number(excellentLandings || 0) >= 10) {
     const achievement = await unlockAchievement({

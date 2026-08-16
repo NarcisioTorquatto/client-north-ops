@@ -2103,12 +2103,15 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
       })
       .eq("id", user.id);
 
-    await processCareerEvents({
+    processCareerEvents({
       userId: user.id,
       activeMission,
       evaluation,
       flightLogId: flightLogData?.id || null,
-    });      
+    }).catch((error) => {
+      console.error("Erro ao processar eventos de carreira:", error);
+    });    
+    
 
     setLastEvaluation({
       ...evaluation,
@@ -2149,8 +2152,10 @@ const finalPayment = Math.round(basePayment * paymentMultiplier);
     lastLivePositionSaveAtRef.current = 0;
 
 
-    await loadActiveMission(user.id);
-
+    loadActiveMission(user.id).catch((error) => {
+      console.error("Erro ao atualizar missão ativa:", error);
+    });
+    
     const levelText =
       newLevel > currentCareer.level
         ? ` Subiu para ${newCareer.title} — nível ${newLevel}!`
