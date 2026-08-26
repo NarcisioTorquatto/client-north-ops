@@ -111,6 +111,15 @@ function isAircraftCompatible(missionAircraft: string, simAircraft: string) {
     ],
 
     [
+      "Black Square Commander 114TC",
+      "Commander 114TC",
+      "Rockwell Commander 114TC",
+      "Rockwell International Commander 114TC",
+      "Rockwell 114TC",
+      "114TC"
+    ],
+    
+    [
       "piperpa28dakota",
       "piperpa28-236dakota",
       "pa28-236dakota",
